@@ -9,8 +9,10 @@ from pyspark.sql.types import StructType, StructField
 from pyspark.sql.functions import expr
 from src.__about__ import __version__
 from src.dataflow_spec import BronzeDataflowSpec, SilverDataflowSpec, DataflowSpecUtils
+from src.dataflow_pipeline_bronze import BronzeDataflowPipeline
+from src.dataflow_pipeline_silver import SilverDataflowPipeline
 from src.pipeline_readers import PipelineReaders
-from src.ab_cancel_translator_integration import ABCancelTranslatorPipeline
+# from src.metastore_ops import DataFlowUtils
 
 logger = logging.getLogger('databricks.labs.dltmeta')
 logger.setLevel(logging.INFO)
@@ -60,9 +62,13 @@ class AppendFlowWriter:
 
 
 class DataflowPipeline:
-    """This class uses dataflowSpec to launch DLT with centralized PII encryption/decryption support.
+    """This class uses dataflowSpec to launch DLT.
 
-    Uses encryption/decryption functions from catalog_dlt_meta.default
+    Raises:
+        Exception: "Dataflow not supported!"
+
+    Returns:
+        [type]: [description]
     """
 
     def __init__(self, spark, dataflow_spec, view_name, view_name_quarantine=None,
@@ -108,7 +114,7 @@ class DataflowPipeline:
         if isinstance(dataflow_spec, BronzeDataflowSpec):
             self.next_snapshot_and_version = next_snapshot_and_version
             if self.next_snapshot_and_version:
-                self.appy_changes_from_snapshot = DataflowSpecUtils.get_apply_changes_from_snapshot(
+                self.apply_changes_from_snapshot = DataflowSpecUtils.get_apply_changes_from_snapshot(
                     self.dataflowSpec.applyChangesFromSnapshot
                 )
             else:
@@ -121,28 +127,65 @@ class DataflowPipeline:
         else:
             self.schema_json = None
             self.next_snapshot_and_version = None
-            self.appy_changes_from_snapshot = None
+            self.apply_changes_from_snapshot = None
         self.silver_schema = None
+
+        # Initialize Bronze and Silver pipeline instances
+        self._initialize_pipeline_instances()
+
+    def _initialize_pipeline_instances(self):
+        """Initialize Bronze and Silver pipeline instances with required parameters."""
+        # Create dummy job arguments if not provided
+        job_arguments = {}
+        
+        # Initialize Bronze pipeline instance
+        if isinstance(self.dataflowSpec, BronzeDataflowSpec):
+            self.bronze_pipeline = BronzeDataflowPipeline(
+                spark=self.spark,
+                dataflow_spec=self.dataflowSpec,
+                view_name=self.view_name,
+                job_arguments=job_arguments,
+                view_name_quarantine=getattr(self, 'view_name_quarantine', None),
+                encryptDataset=self.encryptDataset,
+                decryptDataset=self.decryptDataset,
+                # write_generic=self.write_generic,
+                # fetchJobArguments=self.fetchJobArguments,
+                # apply_data_standardisation=self.apply_data_standardisation
+                custom_transform_func = self.custom_transform_func,
+                next_snapshot_and_version=self.next_snapshot_and_version,
+                # apply_changes_from_snapshot=self.apply_changes_from_snapshot
+            )
+            self.silver_pipeline = None
+        
+        # Initialize Silver pipeline instance
+        elif isinstance(self.dataflowSpec, SilverDataflowSpec):
+            self.silver_pipeline = SilverDataflowPipeline(
+                spark=self.spark,
+                dataflow_spec=self.dataflowSpec,
+                view_name=self.view_name,
+                job_arguments=job_arguments,
+                view_name_quarantine=getattr(self, 'view_name_quarantine', None),
+                encryptDataset=self.encryptDataset,
+                decryptDataset=self.decryptDataset,
+                # write_generic=self.write_generic,
+                # fetchJobArguments=self.fetchJobArguments,
+                # apply_data_standardisation=self.apply_data_standardisation
+            )
+            self.bronze_pipeline = None
 
     def table_has_expectations(self):
         """Table has expectations check."""
         return self.dataflowSpec.dataQualityExpectations is not None
 
     def read(self):
-        """Read DLT."""
+        """Generic Method to read source data for Bronze/Silver/Gold pipeline run
+        Raises:
+            ValueError: Generic Error for the pipeline run """
         logger.info("In read function")
-        if isinstance(self.dataflowSpec, BronzeDataflowSpec) and not self.next_snapshot_and_version:
-            dlt.view(
-                self.read_bronze,
-                name=self.view_name,
-                comment=f"input dataset view for {self.view_name}",
-            )
-        elif isinstance(self.dataflowSpec, SilverDataflowSpec) and not self.next_snapshot_and_version:
-            dlt.view(
-                self.read_silver,
-                name=self.view_name,
-                comment=f"input dataset view for {self.view_name}",
-            )
+        if type(self.dataflowSpec) == BronzeDataflowSpec:
+            return self.bronze_pipeline.read()
+        elif type(self.dataflowSpec) == SilverDataflowSpec :
+            return self.silver_pipeline.read()
         else:
             if not self.next_snapshot_and_version:
                 raise Exception("Dataflow read not supported for {}".format(type(self.dataflowSpec)))
@@ -182,39 +225,17 @@ class DataflowPipeline:
             raise Exception(f"Append Flows not found for dataflowSpec={self.dataflowSpec}")
 
     def write(self):
-        """Write DLT."""
-        if isinstance(self.dataflowSpec, BronzeDataflowSpec):
-            self.write_bronze()
-        elif isinstance(self.dataflowSpec, SilverDataflowSpec):
-            self.write_silver()
+        """Generic Method to write target data for Bronze/Silver/Gold pipeline run
+        Raises:
+            ValueError: Generic Error for the pipeline run """
+        if type(self.dataflowSpec) == BronzeDataflowSpec:
+            self.bronze_pipeline.write_bronze()
+        elif type(self.dataflowSpec) == SilverDataflowSpec:
+            self.silver_pipeline.write_silver()
+        # elif type(self.dataflowSpec) == GoldDataflowSpec:
+        #     self.gold_pipeline.write_gold_view(view_name)
         else:
             raise Exception(f"Dataflow write not supported for type= {type(self.dataflowSpec)}")
-
-    def write_bronze(self):
-        """Write Bronze tables."""
-        bronze_dataflow_spec: BronzeDataflowSpec = self.dataflowSpec
-        if bronze_dataflow_spec.sourceFormat and bronze_dataflow_spec.sourceFormat.lower() == "snapshot":
-            if self.next_snapshot_and_version:
-                self.apply_changes_from_snapshot()
-            else:
-                raise Exception("Snapshot reader function not provided!")
-        elif bronze_dataflow_spec.dataQualityExpectations:
-            self.write_bronze_with_dqe()
-        elif bronze_dataflow_spec.cdcApplyChanges:
-            self.cdc_apply_changes()
-        else:
-            target_path = None if self.uc_enabled else bronze_dataflow_spec.targetDetails["path"]
-            dlt.table(
-                self.write_to_delta,
-                name=f"{bronze_dataflow_spec.targetDetails['table']}",
-                partition_cols=DataflowSpecUtils.get_partition_cols(bronze_dataflow_spec.partitionColumns),
-                cluster_by=DataflowSpecUtils.get_partition_cols(bronze_dataflow_spec.clusterBy),
-                table_properties=bronze_dataflow_spec.tableProperties,
-                path=target_path,
-                comment=f"bronze dlt table{bronze_dataflow_spec.targetDetails['table']}",
-            )
-        if bronze_dataflow_spec.appendFlows:
-            self.write_append_flows()
 
     def write_silver(self):
         """Write silver tables."""
@@ -235,52 +256,9 @@ class DataflowPipeline:
         if silver_dataflow_spec.appendFlows:
             self.write_append_flows()
 
-    def read_bronze(self) -> DataFrame:
-        """Read Bronze Table with PII encryption and AB Cancel Translator support using centralized functions."""
-        logger.info("In read_bronze func with centralized PII encryption and AB Cancel Translator support")
-        
-        # Read source data using pipeline readers
-        pipeline_reader = PipelineReaders(
-            self.spark,
-            self.dataflowSpec.sourceFormat,
-            self.dataflowSpec.sourceDetails,
-            self.dataflowSpec.readerConfigOptions,
-            self.schema_json
-        )
-        bronze_dataflow_spec: BronzeDataflowSpec = self.dataflowSpec
-        input_df = None
-
-        ab_translator = ABCancelTranslatorPipeline(self.spark, bronze_dataflow_spec)
-        if bronze_dataflow_spec.sourceFormat == "cloudFiles":
-            input_df = pipeline_reader.read_dlt_cloud_files()
-        elif bronze_dataflow_spec.sourceFormat == "delta":
-            input_df = pipeline_reader.read_dlt_delta()
-        elif bronze_dataflow_spec.sourceFormat == "eventhub" or bronze_dataflow_spec.sourceFormat == "kafka":
-            input_df = pipeline_reader.read_kafka()
-        elif bronze_dataflow_spec.sourceFormat.lower() in ["ab_binary_messages", "ab_cancel_messages"]:
-        # Handle AB message formats
-            input_df = pipeline_reader.read_dlt_cloud_files()  # Assume binary files
-            input_df = ab_translator.validate_ab_messages(input_df)
-            input_df = ab_translator.translate_ab_messages(input_df)
-        else:
-            raise Exception(f"{bronze_dataflow_spec.sourceFormat} source format not supported")
-        
-        # Apply custom transformations
-        input_df = self.apply_custom_transform_fun(input_df)
-        
-        # Apply PII encryption
-        target_pii_fields = getattr(bronze_dataflow_spec, 'targetPiiFields', {})
-        if target_pii_fields and len(target_pii_fields) > 0:
-            logger.info(f"Applying PII encryption to bronze layer fields: {list(target_pii_fields.keys())}")
-            input_df = self.encryptDataset(
-                data=input_df,
-                piiFields=target_pii_fields,
-                df_spec=bronze_dataflow_spec
-            )
-            logger.info("PII encryption completed for bronze layer")
-        else:
-            logger.info("No PII fields configured for encryption in bronze layer")
-        
+    def apply_custom_transform_fun(self, input_df):
+        if self.custom_transform_func:
+            input_df = self.custom_transform_func(input_df, self.dataflowSpec)
         return input_df
 
     def get_silver_schema(self):
@@ -300,7 +278,15 @@ class DataflowPipeline:
         return raw_delta_table_stream.schema
 
     def __apply_where_clause(self, where_clause, raw_delta_table_stream):
-        """Apply where clause provided in silver transformations."""
+        """This method apply where clause provided in silver transformations
+
+        Args:
+            where_clause (_type_): _description_
+            raw_delta_table_stream (_type_): _description_
+
+        Returns:
+            _type_: _description_
+        """
         if where_clause:
             where_clause_str = " ".join(where_clause)
             if len(where_clause_str.strip()) > 0:
@@ -309,184 +295,136 @@ class DataflowPipeline:
         return raw_delta_table_stream
 
     def read_silver(self) -> DataFrame:
-        """Read Silver tables with PII decryption/encryption support using centralized functions."""
-        logger.info("In read_silver func with centralized PII decryption/encryption")
+        """Read Silver tables."""
         silver_dataflow_spec: SilverDataflowSpec = self.dataflowSpec
         source_database = silver_dataflow_spec.sourceDetails["database"]
         source_table = silver_dataflow_spec.sourceDetails["table"]
         select_exp = silver_dataflow_spec.selectExp
         where_clause = silver_dataflow_spec.whereClause
-        
-        # Get PII field configurations
-        source_pii_fields = getattr(silver_dataflow_spec, 'source_PiiFields', {})
-        target_pii_fields = getattr(silver_dataflow_spec, 'target_PiiFields', {})
-        
-        # Step 1: Read source data from bronze layer (original logic)
         raw_delta_table_stream = self.spark.readStream.table(
             f"{source_database}.{source_table}"
-        ) if self.uc_enabled else self.spark.readStream.load(
+        ).selectExpr(*select_exp) if self.uc_enabled else self.spark.readStream.load(
             path=silver_dataflow_spec.sourceDetails["path"],
             format="delta"
-        )
-        
-        # Step 2: Decrypt source PII fields from bronze layer (NEW FUNCTIONALITY)
-        decrypted_data = raw_delta_table_stream
-        if source_pii_fields and len(source_pii_fields) > 0:
-            logger.info(f"Decrypting source PII fields from bronze: {list(source_pii_fields.keys())}")
-            decrypted_data = self.decryptDataset(
-                data=raw_delta_table_stream,
-                piiFields=source_pii_fields
-            )
-            logger.info("Source PII decryption completed")
-        else:
-            logger.info("No source PII fields configured for decryption")
-        
-        # Step 3: Apply transformations (original logic)
-        transformed_data = decrypted_data.selectExpr(*select_exp)
-        transformed_data = self.__apply_where_clause(where_clause, transformed_data)
-        
-        # Step 4: Apply custom transformations (original logic)
-        transformed_data = self.apply_custom_transform_fun(transformed_data)
-        
-        # Step 5: Encrypt target PII fields for silver layer (NEW FUNCTIONALITY)
-        final_data = transformed_data
-        if target_pii_fields and len(target_pii_fields) > 0:
-            logger.info(f"Applying PII encryption to silver layer fields: {list(target_pii_fields.keys())}")
-            final_data = self.encryptDataset(
-                data=transformed_data,
-                piiFields=target_pii_fields,
-                df_spec=silver_dataflow_spec
-            )
-            logger.info("Target PII encryption completed for silver layer")
-        else:
-            logger.info("No target PII fields configured for encryption in silver layer")
-        
-        return final_data
+        ).selectExpr(*select_exp)
+
+        if where_clause:
+            where_clause_str = " ".join(where_clause)
+            if len(where_clause_str.strip()) > 0:
+                for where_clause in where_clause:
+                    raw_delta_table_stream = raw_delta_table_stream.where(where_clause)
+        return self.apply_custom_transform_fun(raw_delta_table_stream)
 
     def write_to_delta(self):
         """Write to Delta."""
         return dlt.read_stream(self.view_name)
     
-    def encryptDataset(self, data: DataFrame, piiFields: dict, df_spec=None) -> DataFrame:
-        """
-        Generic Method to Encrypt Dataset using centralized encryption functions at catalog_dlt_meta.default
-        
+    def encryptDataset(self, data, piiFields, df_spec) :
+        """Generic Method to Encrypt Dataset before write triggers for Bronze/Silver/Gold pipeline run
         Args:
-            data (DataFrame): Source Dataframe to be encrypted
-            piiFields (dict): Dictionary of PII column name and data type
-            df_spec: Dataflow specification object (optional)
-        
+            data ([DataFrame]): Source Dataframe to be encrypted
+            piiFields ([Dictionary[String,String]]): piiFields Dictionary of key value pair of pii column name and column datatype
         Returns:
-            DataFrame: Encrypted dataframe
-        """
-        logger.info("Starting PII encryption process using catalog_dlt_meta.default.encryptDatabricks")
-        
-        # Clean column names
+            encrypted dataframe
+        Raises:
+            Exception: in case piiFields are incorrectly configured and are not found in source dataframe """
+
+        #Added By Aravind Ravi (Erwin Integration) -- Start
+        # Validate Synapse schema with Silver/Gold SQL DF
         columns = data.columns
         for colmn in columns:
             data = data.withColumnRenamed(existing=f"{colmn}", new=f"{colmn.strip()}")
-        
-        # Validate PII fields
+        # if data is not None and df_spec.enable_erwin_integration is not None :
+        #     if df_spec.enable_erwin_integration.lower() == "true" and (df_spec.create_erwin_schema is None or df_spec.create_erwin_schema.lower() == "false") :
+        #         tgtDBName = df_spec.targetDetails['database']
+        #         tgtTBLName = df_spec.targetDetails['table']
+        #         self.erwinIntergartionFlow.validate_df_erwin_schema(data.schema, df_spec.erwin_objectId, tgtDBName, tgtTBLName)
+        #     else:
+        #         print("----- Erwin Integration is not enabled-----")
+        #Added By Aravind Ravi (Erwin Integration) -- End
+        # unityCatalog = catalog_name
+        # if unityCatalog is not None or unityCatalog !="":
+        #     catalog_name = unityCatalog
+        # if unityCatalog is None  or unityCatalog =="":
+            # dfframework = DataFlowUtils.getconfigfromDBFS(self.spark)        
+            # catalog_name = dfframework.select("catalog_name").collect()[0][0]
         piiFieldsList = list(map(lambda x: x.lower(), piiFields.keys()))
-        datasetColumns = list(map(lambda x: x.lower(), data.columns))
+        datasetColumns = list(map(lambda x: x.lower(),data.columns))
         missingColumns = list(set(piiFieldsList).difference(datasetColumns))
-        
-        logger.info(f"PII fields to encrypt: {piiFieldsList}")
-        
-        if len(piiFieldsList) == 0:
-            logger.info("No PII fields to encrypt")
+        print("The listed pii fields are "+str(piiFieldsList))
+        if(len(piiFieldsList) == 0) :
             return data
-            
-        if len(missingColumns) > 0:
-            logger.warning(f"PII fields {missingColumns} not found in dataset columns {datasetColumns}")
-            # Continue with available fields instead of failing
-            available_pii_fields = {k: v for k, v in piiFields.items() if k.lower() not in [m.lower() for m in missingColumns]}
-            if len(available_pii_fields) == 0:
-                logger.warning("No PII fields available for encryption")
-                return data
-            piiFields = available_pii_fields
-        
-        # Apply encryption to each PII field using centralized functions
+        if(len(missingColumns) > 0) :
+            raise Exception(f"PII fields listed {missingColumns} are not present in source dataset columns {data.columns}")
         for column in piiFields:
             datatype = piiFields[column]
-            if datatype is not None:
-                try:
-                    # Handle complex data types
-                    if datatype.lower().count("array") or datatype.lower().count("struct"):
-                        data = data.withColumn(column, expr(f"to_json(`{column}`)"))
-                    else:
-                        data = data.withColumn(column, expr(f"cast(`{column}` as string)"))
-                    
-                    # Apply encryption using centralized function at catalog_dlt_meta.default
-                    data = data.withColumn(column, expr(f"catalog_dlt_meta.default.encryptDatabricks(`{column}`)"))
-                    logger.info(f"Encrypted PII field: {column}")
-                    
-                except Exception as e:
-                    logger.error(f"Failed to encrypt field {column}: {e}")
-                    # Continue with other fields
-                    continue
-        
-        logger.info("PII encryption process completed using catalog_dlt_meta.default")
+            if(datatype is not None) :
+                if(datatype.lower().count("array") or  datatype.lower().count("struct")) :
+                    data = data.withColumn(column, expr(f"to_json(`{column}`)"))
+                    print("-----------data is------------"+str(data))
+                else :
+                    data = data.withColumn(column, expr(f"cast(`{column}` as string)"))
+                data = data.withColumn(column ,expr(f"catalog_dlt_meta.default.encryptDatabricks(`{column}`)"))
         return data
 
-    def decryptDataset(self, data: DataFrame, piiFields: dict) -> DataFrame:
-        """
-        Generic Method to Decrypt Dataset using centralized decryption functions at catalog_dlt_meta.default
-        
+    def decryptDataset(self, data, piiFields) :
+        """Generic Method to Decrypt Dataset before read triggers for Bronze/Silver/Gold pipeline run
         Args:
-            data (DataFrame): Source Dataframe to be decrypted
-            piiFields (dict): Dictionary of PII column name and data type
-        
+            data ([DataFrame]): Source Dataframe to be decrypted
+            piiFields ([Dictionary[String,String]]): piiFields Dictionary of key value pair of pii column name and column datatype
         Returns:
-            DataFrame: Decrypted dataframe
-        """
-        logger.info("Starting PII decryption process using catalog_dlt_meta.default.decryptDatabricks")
-        
-        # Validate PII fields
+            decrypted dataframe
+        Raises:
+            Exception: in case piiFields are incorrectly configured and are not found in source dataframe """
         piiFieldsList = list(map(lambda x: x.lower(), piiFields.keys()))
-        datasetColumns = list(map(lambda x: x.lower(), data.columns))
+        datasetColumns = list(map(lambda x: x.lower(),data.columns))
         missingColumns = list(set(piiFieldsList).difference(datasetColumns))
-        
-        if len(piiFieldsList) == 0:
-            logger.info("No PII fields to decrypt")
+        # unityCatalog = catalog_name
+        # if unityCatalog is not None or unityCatalog !="":
+        #     catalog_name = unityCatalog
+        # if unityCatalog is None or unityCatalog =="":
+        #     # dfframework = DataFlowUtils.getconfigfromDBFS(self.spark)        
+        #     catalog_name = dfframework.select("catalog_name").collect()[0][0]
+        if(len(piiFieldsList) == 0) :
             return data
-        
-        if len(missingColumns) > 0:
-            logger.warning(f"PII fields {missingColumns} not found in dataset columns {datasetColumns}")
-            # Continue with available fields
-            available_pii_fields = {k: v for k, v in piiFields.items() if k.lower() not in [m.lower() for m in missingColumns]}
-            if len(available_pii_fields) == 0:
-                logger.warning("No PII fields available for decryption")
-                return data
-            piiFields = available_pii_fields
-        
-        # Apply decryption to each PII field using centralized functions
+        ##if(length(missingColumns) > 0) :
+           ## raise Exception(f"PII fields listed {missingColumns} are not present in source dataset columns {data.columns}")
         for column in piiFields:
             datatype = piiFields[column]
-            if datatype is not None:
-                try:
-                    # Apply decryption using centralized function at catalog_dlt_meta.default
-                    data = data.withColumn(column, expr(f"catalog_dlt_meta.default.decryptDatabricks({column})"))
-                    logger.info(f"Decrypted PII field: {column}")
-                    
-                    # Handle complex data types
-                    if datatype.lower().count("array") or datatype.lower().count("struct"):
-                        data = data.withColumn(column, expr(f"from_json({column}, '{datatype}')"))
-                    else:
-                        data = data.withColumn(column, expr(f"cast({column} as {datatype})"))
-                        
-                except Exception as e:
-                    logger.error(f"Failed to decrypt field {column}: {e}")
-                    # Continue with other fields
-                    continue
-        
-        logger.info("PII decryption process completed using catalog_dlt_meta.default")
+            if(datatype is not None) :
+                data = data.withColumn(column,expr(f"catalog_dlt_meta.default.decryptDatabricks({column})"))
+                decrypt_fn = f"catalog_dlt_meta.default.decryptDatabricks({column})"
+                print("-----------decryption function------------"+str(decrypt_fn))
+                if(datatype.lower().count("array") or  datatype.lower().count("struct")) :
+                    data = data.withColumn(column, expr(f"from_json({column}, '{datatype}')"))
+                else :
+                    data = data.withColumn(column, expr(f"cast({column} as {datatype})"))
         return data
+    
+    def __search_rules(self,df,rule):
+        RULE_SQL = ""
+        for row in df:
+            if row['RULE_ID'] == rule:
+                print(row['RULE_ID'])
+                print(row['RULE_SQL'])
+                RULE_SQL = row['RULE_SQL']
+        return RULE_SQL
 
-    def apply_custom_transform_fun(self, input_df):
-        if self.custom_transform_func:
-            input_df = self.custom_transform_func(input_df, self.dataflowSpec)
-        return input_df
+    # def apply_data_standardisation(self, data, data_standard_fields) :
+    #     if(data_standard_fields is not None and type(data_standard_fields) is dict and len(data_standard_fields.keys()) > 0):
+    #         rule_table = self.spark.conf.get("data_standard_rule_table")
+    #         df = self.spark.sql("select * from {}".format(rule_table))
+    #         #df=self.spark.sql("select * from dlt_meta_simulation.datastandard_dataflowspec_table")
+    #         #if type(dataflow_spec) == BronzeDataflowSpec:
+    #         data_standard_col_list = list(data_standard_fields.keys())
+    #         if(len(data_standard_col_list) == 0) :
+    #             return data
+    #         for field in data_standard_col_list:
+    #             rules = data_standard_fields[field].split(',')
+    #             for rule in rules:
+    #                 rule_sqlstr = self.__search_rules(df.collect(),rule)
+    #                 data = data.withColumn(field,expr(rule_sqlstr.replace("$$$DATA_STANDARDIZATION_COL$$$", field)))
+    #     return data
 
     def apply_changes_from_snapshot(self):
         target_path = None if self.uc_enabled else self.dataflowSpec.targetDetails["path"]
@@ -497,10 +435,10 @@ class DataflowPipeline:
             self.next_snapshot_and_version(latest_snapshot_version,
                                            self.dataflowSpec
                                            ),
-            keys=self.appy_changes_from_snapshot.keys,
-            stored_as_scd_type=self.appy_changes_from_snapshot.scd_type,
-            track_history_column_list=self.appy_changes_from_snapshot.track_history_column_list,
-            track_history_except_column_list=self.appy_changes_from_snapshot.track_history_except_column_list,
+            keys=self.apply_changes_from_snapshot.keys,
+            stored_as_scd_type=self.apply_changes_from_snapshot.scd_type,
+            track_history_column_list=self.apply_changes_from_snapshot.track_history_column_list,
+            track_history_except_column_list=self.apply_changes_from_snapshot.track_history_except_column_list,
         )
 
     def write_bronze_with_dqe(self):
@@ -592,7 +530,17 @@ class DataflowPipeline:
                 )
 
     def write_append_flows(self):
-        """Creates an append flow for the target specified in the dataflowSpec."""
+        """Creates an append flow for the target specified in the dataflowSpec.
+
+        This method creates a streaming table with the given schema and target path.
+        It then appends the flow to the table using the specified parameters.
+
+        Args:
+            None
+
+        Returns:
+            None
+        """
         for append_flow in self.appendFlows:
             struct_schema = None
             if self.schema_json:
@@ -708,7 +656,15 @@ class DataflowPipeline:
         )
 
     def get_dq_expectations(self):
-        """Retrieves the data quality expectations for the table."""
+        """
+        Retrieves the data quality expectations for the table.
+
+        Returns:
+            A tuple containing three dictionaries:
+            - expect_all_dict: A dictionary containing the 'expect_all' data quality expectations.
+            - expect_all_or_drop_dict: A dictionary containing the 'expect_all_or_drop' data quality expectations.
+            - expect_all_or_fail_dict: A dictionary containing the 'expect_all_or_fail' data quality expectations.
+        """
         expect_all_dict = None
         expect_all_or_drop_dict = None
         expect_all_or_fail_dict = None
@@ -734,13 +690,52 @@ class DataflowPipeline:
         self.read()
         self.write()
 
+    # def write_generic(self, target_path) :
+    #     target_path = None if self.uc_enabled else bronze_dataflow_spec.targetDetails["path"]
+    #     dlt.table(
+    #         self.write_to_delta,
+    #         name=f"{bronze_dataflow_spec.targetDetails['table']}",
+    #         partition_cols=DataflowSpecUtils.get_partition_cols(bronze_dataflow_spec.partitionColumns),
+    #         cluster_by=DataflowSpecUtils.get_partition_cols(bronze_dataflow_spec.clusterBy),
+    #         table_properties=bronze_dataflow_spec.tableProperties,
+    #         path=target_path,
+    #         comment=f"bronze dlt table{bronze_dataflow_spec.targetDetails['table']}",
+    #     )
+        
+
+    
+    # def fetchJobArguments(self) :
+    #     """Generic Method to fetch ADF pipeline run id and BatchRunDate for Bronze/Silver/Gold pipeline run
+    #     Returns:
+    #         pair of ADF pipeline run id and BatchRunDate
+    #     Raises:
+    #         Exception: Generic Error if no job arguments found for pipeline run """
+    #     job_args = json.loads("{}")
+    #     layer = self.spark.conf.get("layer")
+    #     dataflow_ids = self.spark.conf.get(f"{layer}.dataflowIds", "NOT Defined")
+    #     group = self.spark.conf.get(f"{layer}.group", "NOT Defined")
+    #     if(len(self.job_arguments) == 0) :
+    #         raise Exception(
+    #             f"""job arguments is missing for dataflowId [{dataflow_ids}] or dataGroup [{group}] configured in the job """
+    #         )
+    #     else:
+    #         job_args = json.loads(self.job_arguments[0].get("job_args","{}"))
+    #     jobIdentifier = job_args.get("pipeline_run_id")
+    #     batchRunDate = job_args.get("BatchRunDate")
+    #     return jobIdentifier, batchRunDate
+
     @staticmethod
     def invoke_dlt_pipeline(spark,
                             layer,
                             bronze_custom_transform_func: Callable = None,
                             silver_custom_transform_func: Callable = None,
                             next_snapshot_and_version: Callable = None):
-        """Invoke dlt pipeline will launch dlt with given dataflowspec."""
+        """Invoke dlt pipeline will launch dlt with given dataflowspec.
+
+        Args:
+            spark (_type_): _description_
+            layer (_type_): _description_
+        """
         dataflowspec_list = None
         if "bronze" == layer.lower():
             dataflowspec_list = DataflowSpecUtils.get_bronze_dataflow_spec(spark)

@@ -149,6 +149,20 @@ class DeployCommand:
             raise ValueError("pipeline_name is required")
         if not self.dlt_target_schema:
             raise ValueError("dlt_target_schema is required")
+        # if hasattr(self, 'source_format') and self.source_format.lower().startswith('ab_'):
+        # available, version = validate_ab_translator_availability()
+        # if not available:
+        #     raise ValueError("AB Cancel Translator Stubs required for AB message formats. Install with: pip install /volume/path/ab-cancel-translator-stubs.whl")
+
+        # print("Integration complete! AB Cancel Translator is now integrated into DLT-Meta framework.")
+
+    # def validate_ab_translator_availability():
+    #     """Validate AB Cancel Translator availability"""
+    #     try:
+    #         from ab_cancel_translator_stubs import __version__
+    #         return True, __version__
+    #     except ImportError:
+    #         return False, None
 
 
 class DLTMeta:

@@ -41,7 +41,10 @@ class BronzeDataflowSpec:
     updateDate: datetime
     updatedBy: str
     clusterBy: list
-
+    targetPiiFields: map
+    # abTranslatorConfig: map = None
+    # abValidataionRules: map = None
+    # abMessageTypes: List = None
 
 @dataclass
 class SilverDataflowSpec:
@@ -68,6 +71,8 @@ class SilverDataflowSpec:
     updateDate: datetime
     updatedBy: str
     clusterBy: list
+    source_PiiFields: map
+    target_PiiFields: map
 
 
 @dataclass
@@ -159,8 +164,23 @@ class DataflowSpecUtils:
         "once": False
     }
 
-    additional_bronze_df_columns = ["appendFlows", "appendFlowsSchemas", "applyChangesFromSnapshot", "clusterBy"]
-    additional_silver_df_columns = ["dataQualityExpectations", "appendFlows", "appendFlowsSchemas", "clusterBy"]
+    additional_bronze_df_columns = [
+        "appendFlows", 
+        "appendFlowsSchemas", 
+        "applyChangesFromSnapshot", 
+        "clusterBy",
+        # "abTranslatorConfig",
+        # "abValidationRules", 
+        # "abMessageTypes"
+    ]
+    
+    additional_silver_df_columns = [
+        "dataQualityExpectations", 
+        "appendFlows", 
+        "appendFlowsSchemas", 
+        "clusterBy"
+    ]
+    
     additional_cdc_apply_changes_columns = ["flow_name", "once"]
     apply_changes_from_snapshot_api_attributes = [
         "keys",

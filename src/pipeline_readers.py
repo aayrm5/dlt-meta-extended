@@ -198,3 +198,39 @@ class PipelineReaders:
         else:
             kafka_options = {**kafka_base_ops, **self.reader_config_options}
         return kafka_options
+
+    def read_ab_binary_messages(self) -> DataFrame:
+        """Read AB binary messages from source.
+        
+        Returns:
+            DataFrame: DataFrame containing AB binary messages
+        """
+        logger.info("In read_ab_binary_messages func")
+        
+        source_path = self.source_details["path"]
+    
+        # Read binary files
+        input_df = (
+            self.spark.readStream
+            .format("binaryFile")
+            .options(**self.reader_config_options)
+            .load(source_path)
+        )
+        
+        # Add metadata columns for AB messages
+        input_df = input_df.selectExpr(
+            "*",
+            "path as source_file_path",
+            "modificationTime as source_modification_time",
+            "length as source_file_size"
+        )
+        
+        return input_df
+
+
+
+
+
+
+
+
