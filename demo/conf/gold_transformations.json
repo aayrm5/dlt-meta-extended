@@ -14,7 +14,7 @@
 	{
 		"reference_name": "transactions_slv_vw",
 		"source_table": "catalog_dlt_meta.silver_schema.transactions",
-		"filter_condition": "year(dob) >'2000'",
+		"filter_condition": "year(transaction_date) >'2000'",
 		"is_streaming": "false",
 		"pii_fields": {
          "transaction_id": "int", 
