@@ -284,7 +284,7 @@ class GoldDltViewUtils:
             # print("------------------------tablepath is----------------------"+str(self.table_path))
             # enableCache=self.gld_df_spec.enableCache
             # enableCheckpoint=self.gld_df_spec.enableCheckpoint
-            # dataframe = self.spark.sql(self.sql_condition)
+            dataframe = self.spark.sql(self.sql_condition)
             # print("---------------------enablecache is-----------------"+str(enableCache))
             # print("---------------------enable checkpoint is-----------------"+str(enableCheckpoint))
             # catalog_name=self.gld_df_spec.targetDetails.get("catalog",None)
