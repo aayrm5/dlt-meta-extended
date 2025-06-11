@@ -249,7 +249,7 @@ class DataflowPipeline:
     def write_gold(self):
         """Write gold tables."""
         gold_dataflow_spec: GoldDataflowSpec = self.dataflowSpec
-        cdc_apply_changes = getattr(dataflow_spec, 'cdcApplyChanges', None)
+        cdc_apply_changes = getattr(gold_dataflow_spec, 'cdcApplyChanges', None)
         if cdc_apply_changes:
             self.cdc_apply_changes()
         else:
