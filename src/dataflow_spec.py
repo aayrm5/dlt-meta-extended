@@ -81,17 +81,19 @@ class GoldDataflowSpec:
 
     dataFlowId: str
     dataFlowGroup: str
-    sourceFormat: str
-    sourceDetails: map
-    readerConfigOptions: map
+    isStreaming: str
+    # sourceFormat: str
+    # sourceDetails: map
+    # readerConfigOptions: map
     targetFormat: str
     targetDetails: map
     tableProperties: map
-    selectExp: list
-    whereClause: list
+    # writerConfigOptions: map
+    sources: list
+    dlt_views: list
     partitionColumns: list
-    cdcApplyChanges: str
-    dataQualityExpectations: str
+    # cdcApplyChanges: str
+    # dataQualityExpectations: str
     appendFlows: str
     appendFlowsSchemas: map
     version: str
@@ -100,9 +102,7 @@ class GoldDataflowSpec:
     updateDate: datetime
     updatedBy: str
     clusterBy: list
-    source_PiiFields: map
-    target_PiiFields: map
-
+    targetPiiFields: map
 
 @dataclass
 class CDCApplyChanges:
@@ -211,7 +211,6 @@ class DataflowSpecUtils:
     ]
 
     additional_gold_df_columns = [
-        "dataQualityExpectations", 
         "appendFlows", 
         "appendFlowsSchemas", 
         "clusterBy"

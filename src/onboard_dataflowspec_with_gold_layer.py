@@ -467,16 +467,23 @@ class OnboardDataflowspec:
         gold_data_flow_spec_df = self.__get_gold_dataflow_spec_dataframe(
             onboarding_df, dict_obj["env"]
         )
-        columns = StructType(
-            [
-                StructField("select_exp", ArrayType(StringType(), True), True),
-                StructField(
-                    "target_partition_cols", ArrayType(StringType(), True), True
-                ),
-                StructField("target_table", StringType(), True),
-                StructField("where_clause", ArrayType(StringType(), True), True),
-            ]
-        )
+        columns = StructType([
+            StructField("dlt_views",ArrayType(
+                StructType([StructField("reference_name",StringType(),True),
+                            StructField("sql_condition",StringType(),True)]))),
+                            StructField("sources",ArrayType(
+                                                        StructType([
+                                                            StructField("filter_condition",StringType(),True)
+                                                            ,StructField("pii_fields",MapType(StringType(),StringType(),True),True)
+                                                            ,StructField("reference_name",StringType(),True)
+                                                            # ,StructField("source_catalog",StringType(),True)
+                                                            ,StructField("source_table",StringType(),True)
+                                                            ,StructField("is_streaming",StringType(),True)
+                                                            ])
+                                                            )
+                                        ),
+            StructField("target_table",StringType(),True),
+        ])
 
         emp_rdd = []
         env = dict_obj["env"]
@@ -490,9 +497,8 @@ class OnboardDataflowspec:
         gold_transformation_json_files = gold_transformation_json_file.collect()
         for row in gold_transformation_json_files:
             gold_transformation_json_df = gold_transformation_json_df.union(
-                self.spark.read.option("multiline", "true")
-                .schema(columns)
-                .json(row[f"gold_transformation_json_{env}"])
+                # self.spark.read.option("multiline", "true").schema(columns).json(row[f"gold_transformation_json_{env}"])
+                self.__update_goldtransform_schema(row[f"gold_transformation_json_{env}"], columns)
             )
 
         logger.info(gold_transformation_json_file)
@@ -505,9 +511,10 @@ class OnboardDataflowspec:
         gold_dataflow_spec_df = (
             gold_data_flow_spec_df.drop("target_table")  # .drop("path")
             .drop("target_partition_cols")
-            .withColumnRenamed("select_exp", "selectExp")
-            .withColumnRenamed("where_clause", "whereClause")
         )
+
+        # if(f"source_catalog_{env}" in gold_dataflow_spec_df.select("sources").withColumn("sources",expr("explode(sources)")).select("sources.*").columns) :
+        #     gold_dataflow_spec_df = gold_dataflow_spec_df.withColumn('sources', transform( "sources" , lambda source : source.withField('source_catalog', source[f"source_catalog_{env}"])))
 
         gold_dataflow_spec_df = self.__add_audit_columns(
             gold_dataflow_spec_df,
@@ -555,6 +562,74 @@ class OnboardDataflowspec:
             )
         if not self.uc_enabled:
             self.register_gold_dataflow_spec_tables()
+
+    def __update_goldtransform_schema(self, path, schema):
+        """
+        This function updates a schema for a data flow specification based on a JSON file.
+        Args:
+            path ([Path]): The path to the JSON file containing the data to be processed
+            schema ([StructType]): The schema parameter is a StructType object that defines the structure of the
+                                   DataFrame to be created from the data. It specifies the names and 
+                                   data types of the columns in the DataFrame
+        Returns:
+            A DataFrame object that contains the transformed data from the input JSON file.
+        """
+        if(path.lower().endswith("yaml") or path.lower().endswith("yml")) :
+            yamlBody = self.spark.read.format("text").option("lineSep","\k").load(path).collect().pop()["value"]
+            rows = self.spark.createDataFrame(data=yaml.safe_load(yamlBody), schema = schema).collect()
+        else :
+            rows = self.spark.read.option("multiline", "true").json(path).collect()
+        dict_obj = self.gold_dict_obj
+        env = dict_obj["env"]
+        data = []
+        sourcedata = []
+        for row in rows:
+            dlt_views=row["dlt_views"]
+            target_table=row["target_table"]
+            pii_fields={}
+            sources = row["sources"]
+            for source in sources:
+                if source:
+                    pii_fields = {}
+                    if("pii_fields" in source) :
+                        if(type(source["pii_fields"]) is dict):
+                            json_pii_fields  = source["pii_fields"]
+                        else :
+                            json_pii_fields  = source["pii_fields"].asDict()
+                        for piiField in json_pii_fields :
+                            if(json_pii_fields[piiField]):
+                                pii_fields[piiField] = json_pii_fields[piiField]
+                    else :
+                        pii_fields = {}
+                    if("filter_condition" in source) :
+                        filter_condition = source["filter_condition"]
+                    else :
+                        filter_condition = ""
+                    filter_condition = source["filter_condition"]
+                    #isDlt = source["isDlt"]
+                    reference_name = source["reference_name"]
+                    #source_path_{env} = source[f"source_path_{env}"]
+                    # source_catalog= source["source_catalog"] if "source_catalog" in source else ""
+                    source_table = source["source_table"]
+                    source_is_streaming = source["is_streaming"] if "is_streaming" in source else "false"
+                    sourceRow = (
+                        filter_condition,
+                        pii_fields,
+                        reference_name,
+                        # source_catalog,
+                        source_table,
+                        source_is_streaming
+                    )
+                    sourcedata.append(sourceRow)
+            dataRow = (
+                dlt_views,
+                sourcedata,
+                target_table
+            )
+            data.append(dataRow)
+            sourcedata = []
+        data_flow_spec_rows_df = self.spark.createDataFrame(data, schema)
+        return data_flow_spec_rows_df
 
     def __delete_none(self, _dict):
         """Delete None values recursively from all of the dictionaries"""
@@ -1352,49 +1427,36 @@ class OnboardDataflowspec:
         data_flow_spec_columns = [
             "dataFlowId",
             "dataFlowGroup",
-            "sourceFormat",
-            "sourceDetails",
-            "readerConfigOptions",
+            "isStreaming", 
+            # "sourceFormat", Not needed
+            # "sourceDetails", Not needed
+            # "readerConfigOptions", not needed
             "targetFormat",
             "targetDetails",
             "tableProperties",
+            # "sources",
+            # "dlt_views"
             "partitionColumns",
-            "cdcApplyChanges",
-            "dataQualityExpectations",
-            "appendFlows",
+            # "cdcApplyChanges",
+            # "dataQualityExpectations",
+            "appendFlows", #check relevance
             "appendFlowsSchemas",
             "clusterBy",
-            "source_PiiFields",
-            "target_PiiFields"
+            "targetPiiFields"
         ]
         data_flow_spec_schema = StructType(
             [
                 StructField("dataFlowId", StringType(), True),
                 StructField("dataFlowGroup", StringType(), True),
-                StructField("sourceFormat", StringType(), True),
-                StructField(
-                    "sourceDetails", MapType(StringType(), StringType(), True), True
-                ),
-                StructField(
-                    "readerConfigOptions",
-                    MapType(StringType(), StringType(), True),
-                    True,
-                ),
+                StructField("isStreaming", StringType(), True),
                 StructField("targetFormat", StringType(), True),
-                StructField(
-                    "targetDetails", MapType(StringType(), StringType(), True), True
-                ),
-                StructField(
-                    "tableProperties", MapType(StringType(), StringType(), True), True
-                ),
+                StructField("targetDetails", MapType(StringType(), StringType(), True), True),
+                StructField("tableProperties", MapType(StringType(), StringType(), True), True),
                 StructField("partitionColumns", ArrayType(StringType(), True), True),
-                StructField("cdcApplyChanges", StringType(), True),
-                StructField("dataQualityExpectations", StringType(), True),
                 StructField("appendFlows", StringType(), True),
                 StructField("appendFlowsSchemas", MapType(StringType(), StringType(), True), True),
                 StructField("clusterBy", ArrayType(StringType(), True), True),
-                StructField("source_PiiFields", MapType(StringType(), StringType(), True), True),
-                StructField("target_PiiFields", MapType(StringType(), StringType(), True), True)
+                StructField("targetPiiFields",MapType(StringType(), StringType(), True),True,)
             ]
         )
         data = []
@@ -1416,23 +1478,24 @@ class OnboardDataflowspec:
                 self.__validate_mandatory_fields(onboarding_row, mandatory_fields)
             gold_data_flow_spec_id = onboarding_row["data_flow_id"]
             gold_data_flow_spec_group = onboarding_row["data_flow_group"]
-            gold_reader_config_options = {}
+            gold_is_streaming = onboarding_row["is_streaming"]
+            # gold_reader_config_options = {}
 
             gold_target_format = "delta"
 
-            silver_target_details = {
-                "database": onboarding_row["silver_database_{}".format(env)],
-                "table": onboarding_row["silver_table"],
-            }
+            # silver_target_details = {
+            #     "database": onboarding_row["silver_database_{}".format(env)],
+            #     "table": onboarding_row["silver_table"],
+            # }
             gold_target_details = {
                 "database": onboarding_row["gold_database_{}".format(env)],
                 "table": onboarding_row["gold_table"],
             }
 
             if not self.uc_enabled:
-                silver_target_details["path"] = onboarding_row[
-                    f"silver_table_path_{env}"
-                ]
+                # silver_target_details["path"] = onboarding_row[
+                #     f"silver_table_path_{env}"
+                # ]
                 gold_target_details["path"] = onboarding_row[
                     f"gold_table_path_{env}"
                 ]
@@ -1460,19 +1523,6 @@ class OnboardDataflowspec:
             gold_cluster_by = self.__get_cluster_by_properties(onboarding_row, gold_table_properties,
                                                                  "gold_cluster_by")
 
-            gold_cdc_apply_changes = None
-            if (
-                "gold_cdc_apply_changes" in onboarding_row
-                and onboarding_row["gold_cdc_apply_changes"]
-            ):
-                self.__validate_apply_changes(onboarding_row, "gold")
-                gold_cdc_apply_changes_row = onboarding_row[
-                    "gold_cdc_apply_changes"
-                ]
-                if self.onboard_file_type == "json":
-                    gold_cdc_apply_changes = json.dumps(
-                        self.__delete_none(gold_cdc_apply_changes_row.asDict())
-                    )
             data_quality_expectations = None
             if f"gold_data_quality_expectations_json_{env}" in onboarding_row:
                 gold_data_quality_expectations_json = onboarding_row[
@@ -1485,44 +1535,32 @@ class OnboardDataflowspec:
             append_flows, append_flow_schemas = self.get_append_flows_json(
                 onboarding_row, layer="gold", env=env
             )
-
-            source_PiiFields = {}
+            targetPiiFields = {}
             if (
-                "gold_source_PiiFields" in onboarding_row
-                and onboarding_row["gold_source_PiiFields"]
+                "targetPiiFields" in onboarding_row
+                and onboarding_row["targetPiiFields"]
             ):
-                print(onboarding_row["gold_source_PiiFields"])
-                source_PiiFields = self.__delete_none(
-                    onboarding_row["gold_source_PiiFields"].asDict()
-                    )
-            
-            target_PiiFields = {}
-            if (
-                "gold_target_PiiFields" in onboarding_row
-                and onboarding_row["gold_target_PiiFields"]
-            ):
-                print(onboarding_row["gold_target_PiiFields"])
-                target_PiiFields = self.__delete_none(
-                    onboarding_row["gold_target_PiiFields"].asDict()
+                print(onboarding_row["targetPiiFields"])
+                targetPiiFields = self.__delete_none(
+                    onboarding_row["targetPiiFields"].asDict()
                     )
 
             gold_row = (
                 gold_data_flow_spec_id,
                 gold_data_flow_spec_group,
-                "delta",
-                silver_target_details,
-                gold_reader_config_options,
+                gold_is_streaming,
+                # silver_target_details,
+                # gold_reader_config_options,
                 gold_target_format,
                 gold_target_details,
                 gold_table_properties,
                 gold_parition_columns,
-                gold_cdc_apply_changes,
-                data_quality_expectations,
+                # gold_cdc_apply_changes,
+                # data_quality_expectations,
                 append_flows,
                 append_flow_schemas,
                 gold_cluster_by,
-                source_PiiFields,
-                target_PiiFields
+                targetPiiFields
             )
             data.append(gold_row)
             logger.info(f"gold_data ==== {data}")

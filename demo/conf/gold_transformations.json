@@ -1,0 +1,29 @@
+[{
+	"target_table": "customers_gold",
+	"sources": [{
+		"reference_name": "customers_slv_vw",
+		"source_table": "catalog_dlt_meta.silver_schema.customers",
+		"filter_condition": "",
+		"is_streaming": "false",
+		"pii_fields":{
+         "email": "string", 
+         "full_name": "string",
+         "address":"string"
+      }
+	},
+	{
+		"reference_name": "transactions_slv_vw",
+		"source_table": "catalog_dlt_meta.silver_schema.transactions",
+		"filter_condition": "year(dob) >'2000'",
+		"is_streaming": "false",
+		"pii_fields": {
+         "transaction_id": "int", 
+         "customer_id": "string",
+         "product_id":"string"
+      }
+	}],
+	"dlt_views": [{
+		"reference_name": "dlt_gold_v1",
+		"sql_condition": "select c.*, t.* from live.customers_slv_vw c INNER JOIN live.transactions_slv_vw t on c.customer_id =t.customer_id"
+	}]
+}]

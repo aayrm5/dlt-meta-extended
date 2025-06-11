@@ -11,6 +11,7 @@ from src.__about__ import __version__
 from src.dataflow_spec import BronzeDataflowSpec, SilverDataflowSpec, GoldDataflowSpec, DataflowSpecUtils
 from src.pipeline_readers import PipelineReaders
 from src.ab_cancel_translator_integration import ABCancelTranslatorPipeline
+from src.dataflow_pipeline_gold import GoldDataflowPipeline,GoldSourceProcessingUtils,GoldDltViewUtils
 
 logger = logging.getLogger('databricks.labs.dltmeta')
 logger.setLevel(logging.INFO)
@@ -97,11 +98,13 @@ class DataflowPipeline:
         if view_name_quarantine:
             self.view_name_quarantine = view_name_quarantine
         self.custom_transform_func = custom_transform_func
-        if dataflow_spec.cdcApplyChanges:
+        cdc_apply_changes = getattr(dataflow_spec, 'cdcApplyChanges', None)
+        if cdc_apply_changes:
             self.cdcApplyChanges = DataflowSpecUtils.get_cdc_apply_changes(self.dataflowSpec.cdcApplyChanges)
         else:
             self.cdcApplyChanges = None
-        if dataflow_spec.appendFlows:
+        append_flows = getattr(dataflow_spec, 'appendFlows', None)
+        if append_flows:
             self.appendFlows = DataflowSpecUtils.get_append_flows(dataflow_spec.appendFlows)
         else:
             self.appendFlows = None
@@ -122,7 +125,11 @@ class DataflowPipeline:
             self.schema_json = None
             self.next_snapshot_and_version = None
             self.appy_changes_from_snapshot = None
-        self.silver_schema = None
+        if isinstance(dataflow_spec, GoldDataflowSpec):
+            self.gold_schema = None
+        else:
+            self.silver_schema = None
+        self.gold_pipeline = GoldDataflowPipeline(spark, dataflow_spec, view_name, view_name_quarantine, self.encryptDataset, self.decryptDataset)
 
     def table_has_expectations(self):
         """Table has expectations check."""
@@ -144,11 +151,7 @@ class DataflowPipeline:
                 comment=f"input dataset view for {self.view_name}",
             )
         elif isinstance(self.dataflowSpec, GoldDataflowSpec) and not self.next_snapshot_and_version:
-            dlt.view(
-                self.read_gold,
-                name=self.view_name,
-                comment=f"input dataset view for {self.view_name}",
-            )
+            return self.gold_pipeline.read()
         else:
             if not self.next_snapshot_and_version:
                 raise Exception("Dataflow read not supported for {}".format(type(self.dataflowSpec)))
@@ -187,7 +190,7 @@ class DataflowPipeline:
         else:
             raise Exception(f"Append Flows not found for dataflowSpec={self.dataflowSpec}")
 
-    def write(self):
+    def write(self,view_name=None):
         """Write DLT."""
         if isinstance(self.dataflowSpec, BronzeDataflowSpec):
             self.write_bronze()
@@ -246,7 +249,8 @@ class DataflowPipeline:
     def write_gold(self):
         """Write gold tables."""
         gold_dataflow_spec: GoldDataflowSpec = self.dataflowSpec
-        if gold_dataflow_spec.cdcApplyChanges:
+        cdc_apply_changes = getattr(dataflow_spec, 'cdcApplyChanges', None)
+        if cdc_apply_changes:
             self.cdc_apply_changes()
         else:
             target_path = None if self.uc_enabled else gold_dataflow_spec.targetDetails["path"]
@@ -390,60 +394,60 @@ class DataflowPipeline:
         
         return final_data
     
-    def read_gold(self) -> DataFrame:
-        """Read Gold tables with PII decryption/encryption support using centralized functions."""
-        logger.info("In read_gold func with centralized PII decryption/encryption")
-        gold_dataflow_spec: GoldDataflowSpec = self.dataflowSpec
-        source_database = gold_dataflow_spec.sourceDetails["database"]
-        source_table = gold_dataflow_spec.sourceDetails["table"]
-        select_exp = gold_dataflow_spec.selectExp
-        where_clause = gold_dataflow_spec.whereClause
+    # def read_gold(self) -> DataFrame:
+    #     """Read Gold tables with PII decryption/encryption support using centralized functions."""
+    #     logger.info("In read_gold func with centralized PII decryption/encryption")
+    #     gold_dataflow_spec: GoldDataflowSpec = self.dataflowSpec
+    #     source_database = gold_dataflow_spec.sourceDetails["database"]
+    #     source_table = gold_dataflow_spec.sourceDetails["table"]
+    #     select_exp = gold_dataflow_spec.selectExp
+    #     where_clause = gold_dataflow_spec.whereClause
         
-        # Get PII field configurations
-        source_pii_fields = getattr(gold_dataflow_spec, 'gold_source_PiiFields', {})
-        target_pii_fields = getattr(gold_dataflow_spec, 'gold_target_PiiFields', {})
+    #     # Get PII field configurations
+    #     source_pii_fields = getattr(gold_dataflow_spec, 'gold_source_PiiFields', {})
+    #     target_pii_fields = getattr(gold_dataflow_spec, 'gold_target_PiiFields', {})
         
-        # Read source data from bronze layer
-        raw_delta_table_stream = self.spark.readStream.table(
-            f"{source_database}.{source_table}"
-        ) if self.uc_enabled else self.spark.readStream.load(
-            path=gold_dataflow_spec.sourceDetails["path"],
-            format="delta"
-        )
+    #     # Read source data from bronze layer
+    #     raw_delta_table_stream = self.spark.readStream.table(
+    #         f"{source_database}.{source_table}"
+    #     ) if self.uc_enabled else self.spark.readStream.load(
+    #         path=gold_dataflow_spec.sourceDetails["path"],
+    #         format="delta"
+    #     )
         
-        # Decrypt source PII fields from silver layer
-        decrypted_data = raw_delta_table_stream
-        if source_pii_fields and len(source_pii_fields) > 0:
-            logger.info(f"Decrypting source PII fields from bronze: {list(source_pii_fields.keys())}")
-            decrypted_data = self.decryptDataset(
-                data=raw_delta_table_stream,
-                piiFields=source_pii_fields
-            )
-            logger.info("Source PII decryption completed")
-        else:
-            logger.info("No source PII fields configured for decryption")
+    #     # Decrypt source PII fields from silver layer
+    #     decrypted_data = raw_delta_table_stream
+    #     if source_pii_fields and len(source_pii_fields) > 0:
+    #         logger.info(f"Decrypting source PII fields from silver: {list(source_pii_fields.keys())}")
+    #         decrypted_data = self.decryptDataset(
+    #             data=raw_delta_table_stream,
+    #             piiFields=source_pii_fields
+    #         )
+    #         logger.info("Source PII decryption completed for gold layer")
+    #     else:
+    #         logger.info("No source PII fields configured for decryption in gold layer")
         
-        # Step 3: Apply transformations 
-        transformed_data = decrypted_data.selectExpr(*select_exp)
-        transformed_data = self.__apply_where_clause(where_clause, transformed_data)
+    #     # Apply transformations 
+    #     transformed_data = decrypted_data.selectExpr(*select_exp)
+    #     transformed_data = self.__apply_where_clause(where_clause, transformed_data)
         
-        # Step 4: Apply custom transformations 
-        transformed_data = self.apply_custom_transform_fun(transformed_data)
+    #     # Apply custom transformations 
+    #     transformed_data = self.apply_custom_transform_fun(transformed_data)
         
-        # Step 5: Encrypt target PII fields for gold layer 
-        final_data = transformed_data
-        if target_pii_fields and len(target_pii_fields) > 0:
-            logger.info(f"Applying PII encryption to silver layer fields: {list(target_pii_fields.keys())}")
-            final_data = self.encryptDataset(
-                data=transformed_data,
-                piiFields=target_pii_fields,
-                df_spec=gold_dataflow_spec
-            )
-            logger.info("Target PII encryption completed for gold layer")
-        else:
-            logger.info("No target PII fields configured for encryption in gold layer")
+    #     # ncrypt target PII fields for gold layer 
+    #     final_data = transformed_data
+    #     if target_pii_fields and len(target_pii_fields) > 0:
+    #         logger.info(f"Applying PII encryption to silver layer fields: {list(target_pii_fields.keys())}")
+    #         final_data = self.encryptDataset(
+    #             data=transformed_data,
+    #             piiFields=target_pii_fields,
+    #             df_spec=gold_dataflow_spec
+    #         )
+    #         logger.info("Target PII encryption completed for gold layer")
+    #     else:
+    #         logger.info("No target PII fields configured for encryption in gold layer")
         
-        return final_data
+    #     return final_data
 
     def write_to_delta(self):
         """Write to Delta."""
@@ -811,10 +815,15 @@ class DataflowPipeline:
         return expect_all_dict, expect_all_or_drop_dict, expect_all_or_fail_dict
 
     def run_dlt(self):
-        """Run DLT."""
+        """Generic Method to run DLT for Bronze/Silver/Gold flows
+        """
+        # pipelineconf = self.spark.sparkContext.getConf().getAll()
+        # for val in pipelineconf:
+        #     if val[0] == 'pipelines.id':
+        #         pipeline_id = val[1]
+        print("Inside the run DLT method")  
         logger.info("in run_dlt function")
-        self.read()
-        self.write()
+        self.write(self.read())
 
     @staticmethod
     def invoke_dlt_pipeline(spark,
@@ -835,6 +844,11 @@ class DataflowPipeline:
             DataflowPipeline._launch_dlt_flow(
                 spark, "silver", dataflowspec_list, silver_custom_transform_func, next_snapshot_and_version
             )
+        elif "gold" == layer.lower():
+            dataflowspec_list = DataflowSpecUtils.get_gold_dataflow_spec(spark)
+            DataflowPipeline._launch_dlt_flow(
+                spark, "gold", dataflowspec_list, gold_custom_transform_func, next_snapshot_and_version
+            )
         elif "bronze_silver" == layer.lower():
             bronze_dataflowspec_list = DataflowSpecUtils.get_bronze_dataflow_spec(spark)
             DataflowPipeline._launch_dlt_flow(
@@ -844,11 +858,20 @@ class DataflowPipeline:
             DataflowPipeline._launch_dlt_flow(
                 spark, "silver", silver_dataflowspec_list, silver_custom_transform_func
             )
-        elif "gold" == layer.lower():
-            dataflowspec_list = DataflowSpecUtils.get_gold_dataflow_spec(spark)
+        elif "bronze_silver_gold" == layer.lower():  # Add full pipeline support
+            bronze_dataflowspec_list = DataflowSpecUtils.get_bronze_dataflow_spec(spark)
             DataflowPipeline._launch_dlt_flow(
-                spark, "gold", dataflowspec_list, gold_custom_transform_func, next_snapshot_and_version
+                spark, "bronze", bronze_dataflowspec_list, bronze_custom_transform_func
             )
+            silver_dataflowspec_list = DataflowSpecUtils.get_silver_dataflow_spec(spark)
+            DataflowPipeline._launch_dlt_flow(
+                spark, "silver", silver_dataflowspec_list, silver_custom_transform_func
+            )
+            gold_dataflowspec_list = DataflowSpecUtils.get_gold_dataflow_spec(spark)
+            DataflowPipeline._launch_dlt_flow(
+                spark, "gold", gold_dataflowspec_list, gold_custom_transform_func
+            )
+        
 
     @staticmethod
     def _launch_dlt_flow(
