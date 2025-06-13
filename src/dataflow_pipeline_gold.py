@@ -109,7 +109,7 @@ class GoldDataflowPipeline:
                 encrypt_data = "true"
             view_processing = GoldDltViewUtils(self.spark, self.table_name, viewName, dlt_view["sql_condition"], gold_dataflow_spec.targetPiiFields, encrypt_data, self.encryptDataset, gold_dataflow_spec) # Option gold_dataflow_spec added as parm in encryptDataset : Added By Aravind Ravi (Erwin Integration)
             view_processing.register_dlt_view()
-        return viewName
+        return dlt.read(viewName)
 
     def cdc_apply_changes(self):
         """Legacy code to write bronze tables with dlt based cdc - reference for future for streaming CDC cases

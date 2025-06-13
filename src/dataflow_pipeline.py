@@ -151,7 +151,11 @@ class DataflowPipeline:
                 comment=f"input dataset view for {self.view_name}",
             )
         elif isinstance(self.dataflowSpec, GoldDataflowSpec) and not self.next_snapshot_and_version:
-            return self.gold_pipeline.read()
+            dlt.view(
+                self.gold_pipeline.read,
+                name=self.view_name,
+                comment=f"input dataset view for {self.view_name}",
+            )
         else:
             if not self.next_snapshot_and_version:
                 raise Exception("Dataflow read not supported for {}".format(type(self.dataflowSpec)))
