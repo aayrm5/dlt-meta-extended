@@ -1,0 +1,1 @@
+`Op` STRING, `customer_id` INT, `first_name` STRING, `addresses` ARRAY<STRUCT<`type`: STRING, `street`: STRING, `city`: STRING, `details`: STRUCT<`zip`: STRING, `country`: STRING>>>

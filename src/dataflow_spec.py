@@ -41,7 +41,13 @@ class BronzeDataflowSpec:
     updateDate: datetime
     updatedBy: str
     clusterBy: list
-
+    targetPiiFields: map
+    isStreaming: str
+    flattenNestedData: str
+    columnToExtract: list
+    # abTranslatorConfig: map = None
+    # abValidataionRules: map = None
+    # abMessageTypes: List = None
 
 @dataclass
 class SilverDataflowSpec:
@@ -68,7 +74,38 @@ class SilverDataflowSpec:
     updateDate: datetime
     updatedBy: str
     clusterBy: list
+    source_PiiFields: map
+    target_PiiFields: map
 
+
+@dataclass
+class GoldDataflowSpec:
+    """A schema to hold a dataflow spec used for writing to the silver layer."""
+
+    dataFlowId: str
+    dataFlowGroup: str
+    isStreaming: str
+    # sourceFormat: str
+    # sourceDetails: map
+    # readerConfigOptions: map
+    targetFormat: str
+    targetDetails: map
+    tableProperties: map
+    # writerConfigOptions: map
+    sources: list
+    dlt_views: list
+    partitionColumns: list
+    cdcApplyChanges: str
+    # dataQualityExpectations: str
+    appendFlows: str
+    appendFlowsSchemas: map
+    version: str
+    createDate: datetime
+    createdBy: str
+    updateDate: datetime
+    updatedBy: str
+    clusterBy: list
+    targetPiiFields: map
 
 @dataclass
 class CDCApplyChanges:
@@ -159,8 +196,29 @@ class DataflowSpecUtils:
         "once": False
     }
 
-    additional_bronze_df_columns = ["appendFlows", "appendFlowsSchemas", "applyChangesFromSnapshot", "clusterBy"]
-    additional_silver_df_columns = ["dataQualityExpectations", "appendFlows", "appendFlowsSchemas", "clusterBy"]
+    additional_bronze_df_columns = [
+        "appendFlows", 
+        "appendFlowsSchemas", 
+        "applyChangesFromSnapshot", 
+        "clusterBy",
+        # "abTranslatorConfig",
+        # "abValidationRules", 
+        # "abMessageTypes"
+    ]
+    
+    additional_silver_df_columns = [
+        "dataQualityExpectations", 
+        "appendFlows", 
+        "appendFlowsSchemas", 
+        "clusterBy"
+    ]
+
+    additional_gold_df_columns = [
+        "appendFlows", 
+        "appendFlowsSchemas", 
+        "clusterBy"
+    ]
+    
     additional_cdc_apply_changes_columns = ["flow_name", "once"]
     apply_changes_from_snapshot_api_attributes = [
         "keys",
@@ -248,6 +306,21 @@ class DataflowSpecUtils:
             )
             silver_dataflow_spec_list.append(SilverDataflowSpec(**target_row))
         return silver_dataflow_spec_list
+    
+    @staticmethod
+    def get_gold_dataflow_spec(spark) -> List[GoldDataflowSpec]:
+        """Get gold dataflow spec list."""
+        DataflowSpecUtils.check_spark_dataflowpipeline_conf_params(spark, "gold")
+
+        dataflow_spec_rows = DataflowSpecUtils._get_dataflow_spec(spark, "gold").collect()
+        gold_dataflow_spec_list: list[GoldDataflowSpec] = []
+        for row in dataflow_spec_rows:
+            target_row = DataflowSpecUtils.populate_additional_df_cols(
+                row.asDict(),
+                DataflowSpecUtils.additional_gold_df_columns
+            )
+            gold_dataflow_spec_list.append(GoldDataflowSpec(**target_row))
+        return gold_dataflow_spec_list
 
     @staticmethod
     def check_spark_dataflowpipeline_conf_params(spark, layer_arg):

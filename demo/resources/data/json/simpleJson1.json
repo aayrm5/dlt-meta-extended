@@ -1,0 +1,38 @@
+[
+      {
+        "Op": "I",
+        "dmsTimestamp": "2025-01-15T10:30:00Z",
+        "customer_id": 1001,
+        "first_name": "John",
+        "last_name": "Doe",
+        "email": "john.doe@email.com",
+        "address": "123 Main St",
+        "dob": "1990-05-15",
+        "contact_info": {
+          "phone": "555-0123",
+          "emergency_contact": {
+            "name": "Jane Doe",
+            "phone": "555-0456",
+            "relationship": "spouse"
+          }
+        }
+      },
+      {
+        "Op": "U",
+        "dmsTimestamp": "2025-01-15T11:00:00Z",
+        "customer_id": 1002,
+        "first_name": "Alice",
+        "last_name": "Smith",
+        "email": "alice.smith@email.com",
+        "address": "456 Oak Ave",
+        "dob": "1985-08-22",
+        "contact_info": {
+          "phone": "555-0789",
+          "emergency_contact": {
+            "name": "Bob Smith",
+            "phone": "555-0321",
+            "relationship": "brother"
+          }
+        }
+      }
+    ]

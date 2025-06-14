@@ -1,0 +1,7 @@
+dmsTimestamp,customer_id,first_name,last_name,email,address,dob
+2025-06-14 10:10:00.000000,1,Breanna,Bowman,qmarsh@example.com,USNS Serrano FPO AP 64062,1980-05-27
+2025-06-14 10:10:00.000000,2,Monique,Willis,monique.willis2025@example.com,"999 New Brian Loop, Omaha, NE 68104",2005-04-25
+2025-06-14 10:10:00.000000,3,Taylor,Jones,logan92@example.org,"69410 Jody Cove Collinsville, IN 29601",1980-01-29
+2025-06-14 10:10:00.000000,4,Bryan,Scott,bryan.scott@example.com,"1000 New Pike Suite 900 West Jessechester, HI 66100",1988-12-23
+2025-06-14 10:10:00.000000,5,Ashley,Graham,munozmark@example.org,"221 Steven Brooks North Tammyhaven, OR 67323",1995-04-19
+2025-06-14 10:10:00.000000,6,Emily,Stone,emily.stone@example.com,"123 New Lane Springfield, IL 62704",1993-11-15

@@ -1,0 +1,28 @@
+{
+  "dataset": "ab_cancel_messages",
+  "rules": [
+    {
+      "product": "DLT",
+      "rule_type": "expect_column_to_exist", 
+      "rule": "ab_translated_data"
+    },
+    {
+      "product": "DLT",
+      "rule_type": "expect_column_values_to_not_be_null",
+      "rule": "ab_success"
+    },
+    {
+      "product": "DLT", 
+      "rule_type": "expect_column_values_to_be_between",
+      "rule": "ab_field_count",
+      "min_value": 1,
+      "max_value": 100
+    },
+    {
+      "product": "DLT",
+      "rule_type": "expect_column_values_to_be_in_set",
+      "rule": "ab_cancel_type", 
+      "value_set": [5, 6, 7, 11, 15]
+    }
+  ]
+}
