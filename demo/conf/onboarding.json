@@ -1,0 +1,207 @@
+[
+   {
+      "data_flow_id": "100",
+      "data_flow_group": "A1",
+      "source_system": "mysql",
+      "source_format": "cloudFiles",
+      "source_details": {
+         "source_database": "customers",
+         "source_table": "customers",
+         "source_path_prod": "file:/Workspace/Users/riyazali.mohammad@celebaltech.com/dlt-meta/demo/resources/data/customers",
+         "source_schema_path": "file:/Workspace/Users/riyazali.mohammad@celebaltech.com/dlt-meta/demo/resources/ddl/customers.ddl"
+      },
+      "bronze_database_prod": "catalog_dlt_meta.bronze_schema",
+      "bronze_table": "customers",
+      "bronze_reader_options": {
+         "cloudFiles.format": "csv",
+         "cloudFiles.rescuedDataColumn": "_rescued_data",
+         "header": "true"
+      },
+      "targetPiiFields" : {
+         "first_name":"string",
+         "email":"string",
+         "last_name":"string",
+         "address":"string",
+         "dob":"date"
+      },
+      "bronze_cluster_by":["customer_id"],
+      "bronze_data_quality_expectations_json_prod": "file:/Workspace/Users/riyazali.mohammad@celebaltech.com/dlt-meta/demo/conf/dqe/customers.json",
+      "bronze_database_quarantine_prod": "catalog_dlt_meta.bronze_schema",
+      "bronze_quarantine_table": "customers_quarantine",
+      "silver_database_prod": "catalog_dlt_meta.silver_schema",
+      "silver_table": "customers",
+      "silver_table_path_prod": "/Volumes/dlt_meta_uc/silver_schema/silver_volume/data/silver/customers/",
+      "silver_cdc_apply_changes": {
+         "keys": [
+            "customer_id"
+         ],
+         "sequence_by": "dmsTimestamp",
+         "scd_type": "2",
+         "apply_as_deletes": "Op = 'D'",
+         "except_column_list": [
+            "Op",
+            "dmsTimestamp",
+            "_rescued_data"
+         ]
+      },
+      "source_PiiFields": {
+         "first_name":"string",
+         "email":"string",
+         "last_name":"string",
+         "address":"string",
+         "dob":"date"
+      },
+      "target_PiiFields": {
+         "email": "string", 
+         "full_name": "string",
+         "address":"string"
+      },
+      "silver_cluster_by":["customer_id"],
+      "silver_transformation_json_prod": "file:/Workspace/Users/riyazali.mohammad@celebaltech.com/dlt-meta/demo/conf/silver_transformations.json",
+      "silver_data_quality_expectations_json_prod": "file:/Workspace/Users/riyazali.mohammad@celebaltech.com/dlt-meta/demo/conf/dqe/customers_silver_dqe.json"
+
+   },
+   {
+      "data_flow_id": "101",
+      "data_flow_group": "A1",
+      "source_system": "mysql",
+      "source_format": "cloudFiles",
+      "source_details": {
+         "source_database": "transactions",
+         "source_table": "transactions",
+         "source_path_prod": "file:/Workspace/Users/riyazali.mohammad@celebaltech.com/dlt-meta/demo/resources/data/transactions",
+         "source_schema_path": "file:/Workspace/Users/riyazali.mohammad@celebaltech.com/dlt-meta/demo/resources/ddl/transactions.ddl"
+      },
+      "bronze_database_prod": "catalog_dlt_meta.bronze_schema",
+      "bronze_table": "transactions",
+      "bronze_reader_options": {
+         "cloudFiles.format": "csv",
+         "cloudFiles.rescuedDataColumn": "_rescued_data",
+         "header": "true"
+      },
+      "targetPiiFields" : {
+         "transaction_id": "int", 
+         "customer_id": "string",
+         "product_id":"string"
+      },
+      "bronze_data_quality_expectations_json_prod": "file:/Workspace/Users/riyazali.mohammad@celebaltech.com/dlt-meta/demo/conf/dqe/transactions.json",
+      "bronze_database_quarantine_prod": "catalog_dlt_meta.bronze_schema",
+      "bronze_quarantine_table": "transactions_quarantine",
+      "silver_database_prod": "catalog_dlt_meta.silver_schema",
+      "silver_table": "transactions",
+      "silver_table_path_prod": "/Volumes/dlt_meta_uc/silver_schema/silver_volume/data/silver/transactions/",
+      "silver_cdc_apply_changes": {
+         "keys": [
+            "transaction_id"
+         ],
+         "sequence_by": "dmsTimestamp",
+         "scd_type": "2",
+         "apply_as_deletes": "Op = 'D'",
+         "except_column_list": [
+            "Op",
+            "dmsTimestamp",
+            "_rescued_data"
+         ]
+      },
+      "source_PiiFields": {
+         "transaction_id": "int", 
+         "customer_id": "string",
+         "product_id":"string"
+      },
+      "target_PiiFields": {
+         "transaction_id": "int", 
+         "customer_id": "string"
+      },
+      "silver_transformation_json_prod": "file:/Workspace/Users/riyazali.mohammad@celebaltech.com/dlt-meta/demo/conf/silver_transformations.json",
+      "silver_data_quality_expectations_json_prod": "file:/Workspace/Users/riyazali.mohammad@celebaltech.com/dlt-meta/demo/conf/dqe/transactions_silver_dqe.json"
+   },
+   {
+      "data_flow_id": "103",
+      "data_flow_group": "A1",
+      "source_system": "mysql",
+      "source_format": "cloudFiles",
+      "source_details": {
+         "source_database": "products",
+         "source_table": "products",
+         "source_path_prod": "file:/Workspace/Users/riyazali.mohammad@celebaltech.com/dlt-meta/demo/resources/data/products",
+         "source_schema_path": "file:/Workspace/Users/riyazali.mohammad@celebaltech.com/dlt-meta/demo/resources/ddl/products.ddl"
+      },
+      "bronze_database_prod": "catalog_dlt_meta.bronze_schema",
+      "bronze_table": "products",
+      "bronze_reader_options": {
+         "cloudFiles.format": "csv",
+         "cloudFiles.rescuedDataColumn": "_rescued_data",
+         "header": "true"
+      },
+      "targetPiiFields" : {
+         "name": "string", 
+         "price": "double"
+      },
+      "bronze_data_quality_expectations_json_prod": "file:/Workspace/Users/riyazali.mohammad@celebaltech.com/dlt-meta/demo/conf/dqe/products.json",
+      "bronze_database_quarantine_prod": "catalog_dlt_meta.bronze_schema",
+      "bronze_quarantine_table": "products_quarantine",
+      "silver_database_prod": "catalog_dlt_meta.silver_schema",
+      "silver_table": "products",
+      "silver_table_path_prod": "/Volumes/dlt_meta_uc/silver_schema/silver_volume/data/silver/products/",
+      "silver_cdc_apply_changes": {
+         "keys": [
+            "product_id"
+         ],
+         "sequence_by": "dmsTimestamp",
+         "scd_type": "2",
+         "apply_as_deletes": "Op = 'D'",
+         "except_column_list": [
+            "Op",
+            "dmsTimestamp",
+            "_rescued_data"
+         ]
+      },
+      "source_PiiFields": {"name": "string","price": "double"},
+      "target_PiiFields": {"price": "double"},
+      "silver_transformation_json_prod": "file:/Workspace/Users/riyazali.mohammad@celebaltech.com/dlt-meta/demo/conf/silver_transformations.json",
+      "silver_data_quality_expectations_json_prod": "file:/Workspace/Users/riyazali.mohammad@celebaltech.com/dlt-meta/demo/conf/dqe/products_silver_dqe.json"
+   },
+   {
+      "data_flow_id": "104",
+      "data_flow_group": "A1",
+      "source_system": "mysql",
+      "source_format": "cloudFiles",
+      "source_details": {
+         "source_database": "stores",
+         "source_table": "stores",
+         "source_path_prod": "file:/Workspace/Users/riyazali.mohammad@celebaltech.com/dlt-meta/demo/resources/data/stores",
+         "source_schema_path": "file:/Workspace/Users/riyazali.mohammad@celebaltech.com/dlt-meta/demo/resources/ddl/stores.ddl"
+      },
+      "bronze_database_prod": "catalog_dlt_meta.bronze_schema",
+      "bronze_table": "stores",
+      "bronze_reader_options": {
+         "cloudFiles.format": "csv",
+         "cloudFiles.rescuedDataColumn": "_rescued_data",
+         "header": "true"
+      },
+      "targetPiiFields" : {"address":"string"},
+      "bronze_data_quality_expectations_json_prod": "file:/Workspace/Users/riyazali.mohammad@celebaltech.com/dlt-meta/demo/conf/dqe/stores.json",
+      "bronze_database_quarantine_prod": "catalog_dlt_meta.bronze_schema",
+      "bronze_quarantine_table": "stores_quarantine",
+      "silver_database_prod": "catalog_dlt_meta.silver_schema",
+      "silver_table": "stores",
+      "silver_table_path_prod": "/Volumes/dlt_meta_uc/silver_schema/silver_volume/data/silver/stores/",
+      "silver_cdc_apply_changes": {
+         "keys": [
+            "store_id"
+         ],
+         "sequence_by": "dmsTimestamp",
+         "scd_type": "2",
+         "apply_as_deletes": "Op = 'D'",
+         "except_column_list": [
+            "Op",
+            "dmsTimestamp",
+            "_rescued_data"
+         ]
+      },
+      "source_PiiFields": {"address":"string"},
+      "target_PiiFields": {},
+      "silver_transformation_json_prod": "file:/Workspace/Users/riyazali.mohammad@celebaltech.com/dlt-meta/demo/conf/silver_transformations.json",
+      "silver_data_quality_expectations_json_prod": "file:/Workspace/Users/riyazali.mohammad@celebaltech.com/dlt-meta/demo/conf/dqe/stores_silver_dqe.json"
+   }
+]

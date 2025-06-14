@@ -1,0 +1,255 @@
+{
+  "data_flow_id": "kafka_customer_data_pipeline",
+  "data_flow_group": "customer_data_streaming",
+  "source_format": "kafka",
+  "source_details": {
+    "kafka.bootstrap.servers": "your-kafka-broker1:9092,your-kafka-broker2:9092,your-kafka-broker3:9092",
+    "subscribe": "customer-events-topic",
+    "kafka.security.protocol": "SASL_SSL",
+    "kafka.sasl.mechanism": "PLAIN",
+    "kafka.sasl.jaas.config": "kafkashaded.org.apache.kafka.common.security.plain.PlainLoginModule required username='{{secrets/your-scope/kafka-username}}' password='{{secrets/your-scope/kafka-password}}';",
+    "startingOffsets": "latest",
+    "maxOffsetsPerTrigger": "10000",
+    "kafka.session.timeout.ms": "30000",
+    "kafka.request.timeout.ms": "60000"
+  },
+  "reader_config_options": {
+    "kafka.bootstrap.servers": "your-kafka-broker1:9092,your-kafka-broker2:9092,your-kafka-broker3:9092",
+    "subscribe": "customer-events-topic",
+    "kafka.security.protocol": "SASL_SSL",
+    "kafka.sasl.mechanism": "PLAIN",
+    "kafka.sasl.jaas.config": "kafkashaded.org.apache.kafka.common.security.plain.PlainLoginModule required username='{{secrets/your-scope/kafka-username}}' password='{{secrets/your-scope/kafka-password}}';",
+    "startingOffsets": "latest",
+    "maxOffsetsPerTrigger": "10000",
+    "minPartitions": "3",
+    "failOnDataLoss": "false",
+    "kafka.session.timeout.ms": "30000",
+    "kafka.request.timeout.ms": "60000",
+    "kafka.fetch.min.bytes": "1024",
+    "kafka.fetch.max.wait.ms": "5000",
+    "kafka.max.partition.fetch.bytes": "1048576",
+    "kafka.group.id": "dlt-meta-customer-consumer-group",
+    "kafka.auto.offset.reset": "latest",
+    "kafka.enable.auto.commit": "false"
+  },
+  "schema": "{\"type\":\"struct\",\"fields\":[{\"name\":\"customer_id\",\"type\":\"string\",\"nullable\":false,\"metadata\":{}},{\"name\":\"first_name\",\"type\":\"string\",\"nullable\":true,\"metadata\":{}},{\"name\":\"last_name\",\"type\":\"string\",\"nullable\":true,\"metadata\":{}},{\"name\":\"email\",\"type\":\"string\",\"nullable\":true,\"metadata\":{}},{\"name\":\"phone\",\"type\":\"string\",\"nullable\":true,\"metadata\":{}},{\"name\":\"address\",\"type\":\"string\",\"nullable\":true,\"metadata\":{}},{\"name\":\"city\",\"type\":\"string\",\"nullable\":true,\"metadata\":{}},{\"name\":\"state\",\"type\":\"string\",\"nullable\":true,\"metadata\":{}},{\"name\":\"zip_code\",\"type\":\"string\",\"nullable\":true,\"metadata\":{}},{\"name\":\"country\",\"type\":\"string\",\"nullable\":true,\"metadata\":{}},{\"name\":\"date_of_birth\",\"type\":\"date\",\"nullable\":true,\"metadata\":{}},{\"name\":\"status\",\"type\":\"string\",\"nullable\":true,\"metadata\":{}},{\"name\":\"created_at\",\"type\":\"timestamp\",\"nullable\":true,\"metadata\":{}},{\"name\":\"updated_at\",\"type\":\"timestamp\",\"nullable\":true,\"metadata\":{}},{\"name\":\"event_type\",\"type\":\"string\",\"nullable\":true,\"metadata\":{}},{\"name\":\"event_timestamp\",\"type\":\"timestamp\",\"nullable\":true,\"metadata\":{}}]}",
+  "bronze": {
+    "target_details": {
+      "catalog": "dev_catalog",
+      "schema": "bronze_kafka",
+      "table": "customers_kafka_raw",
+      "path": "/mnt/data/bronze/customers_kafka/"
+    },
+    "target_pii_fields": {
+      "email": "string",
+      "first_name": "string",
+      "last_name": "string",
+      "phone": "string",
+      "address": "string",
+      "date_of_birth": "date"
+    },
+    "partition_columns": [
+      "year(event_timestamp)",
+      "month(event_timestamp)",
+      "day(event_timestamp)"
+    ],
+    "cluster_by": [
+      "customer_id"
+    ],
+    "is_partitioned_by_run_date": "false",
+    "is_streaming": "true",
+    "table_properties": {
+      "delta.autoOptimize.optimizeWrite": "true",
+      "delta.autoOptimize.autoCompact": "true",
+      "delta.enableChangeDataFeed": "true",
+      "delta.logRetentionDuration": "interval 30 days",
+      "delta.deletedFileRetentionDuration": "interval 7 days",
+      "delta.tuneFileSizesForRewrites": "true"
+    },
+    "writer_config_options": {
+      "checkpointLocation": "/mnt/checkpoints/bronze/customers_kafka/",
+      "mergeSchema": "true"
+    },
+    "data_quality_expectations": {
+      "expect": {
+        "valid_customer_id": "customer_id IS NOT NULL AND length(customer_id) > 0",
+        "valid_email_format": "email IS NULL OR email RLIKE '^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+\\\\.[A-Za-z]{2,}$'",
+        "valid_event_type": "event_type IN ('CREATE', 'UPDATE', 'DELETE', 'UPSERT')",
+        "valid_status": "status IS NULL OR status IN ('ACTIVE', 'INACTIVE', 'PENDING', 'SUSPENDED')"
+      },
+      "expect_or_fail": {
+        "customer_id_not_empty": "length(trim(customer_id)) > 0",
+        "event_timestamp_not_null": "event_timestamp IS NOT NULL"
+      },
+      "expect_or_drop": {
+        "valid_phone_format": "phone IS NULL OR phone RLIKE '^[+]?[1-9]?[0-9]{7,15}$'",
+        "reasonable_date_of_birth": "date_of_birth IS NULL OR (date_of_birth >= '1900-01-01' AND date_of_birth <= current_date())"
+      }
+    },
+    "quarantine_target_details": {
+      "catalog": "dev_catalog",
+      "schema": "bronze_kafka",
+      "table": "customers_kafka_quarantine",
+      "path": "/mnt/data/bronze/customers_kafka_quarantine/",
+      "partition_columns": [
+        "year(event_timestamp)",
+        "month(event_timestamp)"
+      ]
+    },
+    "quarantine_table_properties": {
+      "delta.autoOptimize.optimizeWrite": "true",
+      "delta.logRetentionDuration": "interval 90 days"
+    }
+  },
+  "silver": {
+    "source_details": {
+      "path": "/mnt/data/bronze/customers_kafka/",
+      "catalog": "dev_catalog",
+      "schema": "bronze_kafka",
+      "table": "customers_kafka_raw"
+    },
+    "target_details": {
+      "catalog": "dev_catalog",
+      "schema": "silver_kafka",
+      "table": "customers_kafka_clean",
+      "path": "/mnt/data/silver/customers_kafka/"
+    },
+    "select_exp": [
+      "customer_id",
+      "first_name",
+      "last_name",
+      "email",
+      "phone",
+      "address",
+      "city",
+      "state",
+      "zip_code",
+      "country",
+      "date_of_birth",
+      "upper(trim(status)) as status",
+      "created_at",
+      "updated_at",
+      "event_type",
+      "event_timestamp",
+      "current_timestamp() as processed_at",
+      "date_format(event_timestamp, 'yyyy-MM-dd') as event_date",
+      "year(event_timestamp) as event_year",
+      "month(event_timestamp) as event_month",
+      "dayofweek(event_timestamp) as event_day_of_week"
+    ],
+    "where_clause": [
+      "customer_id IS NOT NULL",
+      "event_timestamp IS NOT NULL",
+      "status IN ('ACTIVE', 'INACTIVE', 'PENDING')",
+      "event_type IN ('CREATE', 'UPDATE', 'UPSERT')",
+      "event_timestamp >= current_date() - interval 90 days"
+    ],
+    "source_pii_fields": {
+      "email": "string",
+      "first_name": "string",
+      "last_name": "string",
+      "phone": "string",
+      "address": "string",
+      "date_of_birth": "date"
+    },
+    "target_pii_fields": {
+      "email": "string",
+      "first_name": "string",
+      "last_name": "string",
+      "phone": "string"
+    },
+    "partition_columns": [
+      "event_year",
+      "event_month",
+      "status"
+    ],
+    "cluster_by": [
+      "customer_id",
+      "event_date"
+    ],
+    "is_partitioned_by_run_date": "false",
+    "is_streaming": "false",
+    "table_properties": {
+      "delta.autoOptimize.optimizeWrite": "true",
+      "delta.autoOptimize.autoCompact": "true",
+      "delta.enableChangeDataFeed": "true",
+      "delta.logRetentionDuration": "interval 30 days",
+      "delta.deletedFileRetentionDuration": "interval 7 days",
+      "delta.columnMapping.mode": "name",
+      "delta.feature.allowColumnDefaults": "supported"
+    },
+    "writer_config_options": {
+      "mergeSchema": "true",
+      "optimizeWrite": "true"
+    },
+    "data_quality_expectations": {
+      "expect": {
+        "processed_recently": "processed_at >= current_date() - interval 1 day",
+        "valid_event_date": "event_date IS NOT NULL",
+        "consistent_timestamps": "processed_at >= event_timestamp"
+      },
+      "expect_or_drop": {
+        "no_future_events": "event_timestamp <= current_timestamp()",
+        "valid_customer_data": "length(trim(customer_id)) > 0 AND (first_name IS NOT NULL OR last_name IS NOT NULL)"
+      }
+    },
+    "cdc_apply_changes": {
+      "keys": ["customer_id"],
+      "sequence_by": "event_timestamp",
+      "where": "event_type != 'DELETE'",
+      "ignore_null_updates": "true",
+      "apply_as_deletes": "event_type = 'DELETE'",
+      "stored_as_scd_type": "1",
+      "column_list": [
+        "customer_id",
+        "first_name", 
+        "last_name",
+        "email",
+        "phone",
+        "address",
+        "city",
+        "state",
+        "zip_code",
+        "country",
+        "date_of_birth",
+        "status",
+        "created_at",
+        "updated_at",
+        "processed_at"
+      ],
+      "except_column_list": [
+        "event_type",
+        "event_timestamp",
+        "event_date",
+        "event_year",
+        "event_month",
+        "event_day_of_week"
+      ]
+    }
+  },
+  "flatten_nested_data": "false",
+  "column_to_extract": "",
+  "env": "dev",
+  "version": "2.0",
+  "description": "Kafka-based real-time customer data pipeline with Unity Catalog support (catalog.schema.table structure), comprehensive PII encryption/decryption, data quality validation, and CDC support for customer event processing",
+  "metadata": {
+    "created_by": "data-engineering-team",
+    "created_date": "2024-01-15",
+    "last_modified": "2024-01-15",
+    "business_owner": "customer-analytics-team",
+    "data_classification": "confidential",
+    "retention_policy": "7_years",
+    "compliance_requirements": [
+      "GDPR",
+      "CCPA",
+      "SOX"
+    ],
+    "tags": [
+      "customer-data",
+      "real-time",
+      "pii-encrypted",
+      "kafka-streaming",
+      "unity-catalog"
+    ]
+  }
+}
