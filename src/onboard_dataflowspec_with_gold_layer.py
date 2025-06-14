@@ -729,6 +729,9 @@ class OnboardDataflowspec:
             "appendFlowsSchemas",
             "clusterBy",
             "targetPiiFields",
+            "isStreaming",
+            "flattenNestedData",
+            "columnToExtract",
             # "abTranslatorConfig",
             # "abValidationRules", 
             # "abMessageTypes",
@@ -772,6 +775,9 @@ class OnboardDataflowspec:
                 StructField("appendFlowsSchemas", MapType(StringType(), StringType(), True), True),
                 StructField("clusterBy", ArrayType(StringType(), True), True),
                 StructField("targetPiiFields",MapType(StringType(), StringType(), True),True,),
+                StructField("isStreaming", StringType(), True),
+                StructField("flattenNestedData", StringType(), True),
+                StructField("columnToExtract", ArrayType(StringType(), True), True),
                 # StructField("abTranslatorConfig", MapType(StringType(), StringType(), True), True),
                 # StructField("abValidationRules", MapType(StringType(), StringType(), True), True),
                 # StructField("abMessageTypes", ArrayType(StringType(), True), True),
@@ -801,6 +807,9 @@ class OnboardDataflowspec:
             source_format = onboarding_row["source_format"]
             if source_format.lower() not in [
                 "cloudfiles",
+                "csv",
+                "parquet",
+                "json",
                 "eventhub",
                 "kafka",
                 "delta",
@@ -894,6 +903,13 @@ class OnboardDataflowspec:
             append_flows, append_flows_schemas = self.get_append_flows_json(
                 onboarding_row, "bronze", env
             )
+            
+            isStreaming = onboarding_row["isStreaming"]
+
+            flattenNestedData = onboarding_row["flattenNestedData"]
+
+            columnToExtract = onboarding_row["columnToExtract"]
+
             # ab_translator_config, ab_validation_rules, ab_message_types = self.process_ab_config(self, obnoring_row, env)
 
             bronze_row = (
@@ -916,6 +932,9 @@ class OnboardDataflowspec:
                 append_flows_schemas,
                 cluster_by,
                 targetPiiFields,
+                isStreaming,
+                flattenNestedData,
+                columnToExtract
                 # ab_translator_config,
                 # ab_validation_rules,
                 # ab_message_types
@@ -1123,7 +1142,10 @@ class OnboardDataflowspec:
             source_details_file = self.__delete_none(source_details_json.asDict())
             if (source_format.lower() == "cloudfiles"
                     or source_format.lower() == "delta"
-                    or source_format.lower() == "snapshot"):
+                    or source_format.lower() == "snapshot"
+                    or source_format.lower() == "csv"
+                    or source_format.lower() == "json"
+                    or source_format.lower() == "parquet"):
                 if f"source_path_{env}" in source_details_file:
                     source_details["path"] = source_details_file[f"source_path_{env}"]
                 if "source_database" in source_details_file:
@@ -1437,7 +1459,7 @@ class OnboardDataflowspec:
             # "sources",
             # "dlt_views"
             "partitionColumns",
-            # "cdcApplyChanges",
+            "cdcApplyChanges",
             # "dataQualityExpectations",
             "appendFlows", #check relevance
             "appendFlowsSchemas",
@@ -1453,6 +1475,7 @@ class OnboardDataflowspec:
                 StructField("targetDetails", MapType(StringType(), StringType(), True), True),
                 StructField("tableProperties", MapType(StringType(), StringType(), True), True),
                 StructField("partitionColumns", ArrayType(StringType(), True), True),
+                StructField("cdcApplyChanges", StringType(), True),
                 StructField("appendFlows", StringType(), True),
                 StructField("appendFlowsSchemas", MapType(StringType(), StringType(), True), True),
                 StructField("clusterBy", ArrayType(StringType(), True), True),
@@ -1523,6 +1546,20 @@ class OnboardDataflowspec:
             gold_cluster_by = self.__get_cluster_by_properties(onboarding_row, gold_table_properties,
                                                                  "gold_cluster_by")
 
+            gold_cdc_apply_changes = None
+            if (
+                "gold_cdc_apply_changes" in onboarding_row
+                and onboarding_row["gold_cdc_apply_changes"]
+            ):
+                self.__validate_apply_changes(onboarding_row, "gold")
+                gold_cdc_apply_changes_row = onboarding_row[
+                    "gold_cdc_apply_changes"
+                ]
+                if self.onboard_file_type == "json":
+                    gold_cdc_apply_changes = json.dumps(
+                        self.__delete_none(gold_cdc_apply_changes_row.asDict())
+                    )
+
             data_quality_expectations = None
             if f"gold_data_quality_expectations_json_{env}" in onboarding_row:
                 gold_data_quality_expectations_json = onboarding_row[
@@ -1555,7 +1592,7 @@ class OnboardDataflowspec:
                 gold_target_details,
                 gold_table_properties,
                 gold_parition_columns,
-                # gold_cdc_apply_changes,
+                gold_cdc_apply_changes,
                 # data_quality_expectations,
                 append_flows,
                 append_flow_schemas,

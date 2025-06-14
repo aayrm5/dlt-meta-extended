@@ -42,6 +42,9 @@ class BronzeDataflowSpec:
     updatedBy: str
     clusterBy: list
     targetPiiFields: map
+    isStreaming: str
+    flattenNestedData: str
+    columnToExtract: list
     # abTranslatorConfig: map = None
     # abValidataionRules: map = None
     # abMessageTypes: List = None
@@ -92,7 +95,7 @@ class GoldDataflowSpec:
     sources: list
     dlt_views: list
     partitionColumns: list
-    # cdcApplyChanges: str
+    cdcApplyChanges: str
     # dataQualityExpectations: str
     appendFlows: str
     appendFlowsSchemas: map

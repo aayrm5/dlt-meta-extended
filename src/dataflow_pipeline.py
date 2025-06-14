@@ -11,6 +11,7 @@ from src.__about__ import __version__
 from src.dataflow_spec import BronzeDataflowSpec, SilverDataflowSpec, GoldDataflowSpec, DataflowSpecUtils
 from src.pipeline_readers import PipelineReaders
 from src.ab_cancel_translator_integration import ABCancelTranslatorPipeline
+from src.dataflow_pipeline_bronze import BronzeDataflowPipeline
 from src.dataflow_pipeline_gold import GoldDataflowPipeline,GoldSourceProcessingUtils,GoldDltViewUtils
 
 logger = logging.getLogger('databricks.labs.dltmeta')
@@ -129,6 +130,8 @@ class DataflowPipeline:
             self.gold_schema = None
         else:
             self.silver_schema = None
+        
+        self.bronze_pipeline = BronzeDataflowPipeline(spark, dataflow_spec, view_name, view_name_quarantine, self.encryptDataset, self.decryptDataset)
         self.gold_pipeline = GoldDataflowPipeline(spark, dataflow_spec, view_name, view_name_quarantine, self.encryptDataset, self.decryptDataset)
 
     def table_has_expectations(self):
@@ -151,7 +154,10 @@ class DataflowPipeline:
                 comment=f"input dataset view for {self.view_name}",
             )
         elif isinstance(self.dataflowSpec, GoldDataflowSpec) and not self.next_snapshot_and_version:
-            return self.gold_pipeline.read()
+            gold_final_view = self.gold_pipeline.read()
+            @dlt.view(name=self.view_name)
+            def final_gold_view():
+                return dlt.read(gold_final_view)
         else:
             if not self.next_snapshot_and_version:
                 raise Exception("Dataflow read not supported for {}".format(type(self.dataflowSpec)))
@@ -270,7 +276,9 @@ class DataflowPipeline:
         """Read Bronze Table with PII encryption and AB Cancel Translator support using centralized functions."""
         logger.info("In read_bronze func with centralized PII encryption and AB Cancel Translator support")
         
-        # Read source data using pipeline readers
+        bronze_dataflow_spec: BronzeDataflowSpec = self.dataflowSpec
+        input_df = None
+
         pipeline_reader = PipelineReaders(
             self.spark,
             self.dataflowSpec.sourceFormat,
@@ -278,21 +286,23 @@ class DataflowPipeline:
             self.dataflowSpec.readerConfigOptions,
             self.schema_json
         )
-        bronze_dataflow_spec: BronzeDataflowSpec = self.dataflowSpec
-        input_df = None
 
-        ab_translator = ABCancelTranslatorPipeline(self.spark, bronze_dataflow_spec)
-        if bronze_dataflow_spec.sourceFormat == "cloudFiles":
-            input_df = pipeline_reader.read_dlt_cloud_files()
-        elif bronze_dataflow_spec.sourceFormat == "delta":
-            input_df = pipeline_reader.read_dlt_delta()
+        # ab_translator = ABCancelTranslatorPipeline(self.spark, bronze_dataflow_spec)
+        if bronze_dataflow_spec.sourceFormat == "cloudFiles" and bronze_dataflow_spec.isStreaming == "true":
+            input_df = self.bronze_pipeline.read_source_streaming()
+        elif (bronze_dataflow_spec.sourceFormat == "csv" or bronze_dataflow_spec.sourceFormat == "parquet" or bronze_dataflow_spec.sourceFormat == "json" or bronze_dataflow_spec.sourceFormat == "delta" ):
+            if bronze_dataflow_spec.isStreaming == "false":
+                input_df = self.bronze_pipeline.read_source_batch()
+            else:
+                input_df = self.bronze_pipeline.read_source_streaming()
+            
         elif bronze_dataflow_spec.sourceFormat == "eventhub" or bronze_dataflow_spec.sourceFormat == "kafka":
             input_df = pipeline_reader.read_kafka()
-        elif bronze_dataflow_spec.sourceFormat.lower() in ["ab_binary_messages", "ab_cancel_messages"]:
-        # Handle AB message formats
-            input_df = pipeline_reader.read_ab_binary_messages()  # Assume binary files
-            input_df = ab_translator.validate_ab_messages(input_df)
-            input_df = ab_translator.translate_ab_messages(input_df)
+        # elif bronze_dataflow_spec.sourceFormat.lower() in ["ab_binary_messages", "ab_cancel_messages"]:
+        # # Handle AB message formats
+        #     input_df = pipeline_reader.read_ab_binary_messages()  # Assume binary files
+        #     input_df = ab_translator.validate_ab_messages(input_df)
+        #     input_df = ab_translator.translate_ab_messages(input_df)
         else:
             raise Exception(f"{bronze_dataflow_spec.sourceFormat} source format not supported")
         
@@ -823,7 +833,8 @@ class DataflowPipeline:
         #         pipeline_id = val[1]
         print("Inside the run DLT method")  
         logger.info("in run_dlt function")
-        self.write(self.read())
+        self.read()
+        self.write()
 
     @staticmethod
     def invoke_dlt_pipeline(spark,

@@ -1,0 +1,8 @@
+{
+    "expect_or_drop": {
+        "valid_customer_id": "customer_id IS NOT NULL"
+    },
+    "expect_or_quarantine": {
+        "quarantine_rule": "customer_id IS NULL"
+    }
+}
