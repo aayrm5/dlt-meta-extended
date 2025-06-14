@@ -1,0 +1,93 @@
+{
+  "Op": "CREATE",
+  "customer_id": 12345,
+  "first_name": "John",
+  "addresses": [
+    {
+      "type": "home",
+      "street": "123 Main St",
+      "city": "New York",
+      "details": {
+        "zip": "10001",
+        "country": "USA",
+        "contact_info": {
+          "phone": {
+            "primary": "555-0123",
+            "emergency": "555-0124",
+            "preferences": {
+              "call_time": "morning",
+              "notification_settings": {
+                "sms": true,
+                "email": true,
+                "push": {
+                  "enabled": true,
+                  "frequency": "daily",
+                  "custom_rules": {
+                    "weekend": false,
+                    "holidays": false,
+                    "advanced_filters": {
+                      "location_based": true,
+                      "time_zone_aware": true,
+                      "user_behavior_analysis": {
+                        "tracking_enabled": true,
+                        "data_retention_days": 365,
+                        "privacy_settings": {
+                          "anonymize_data": true,
+                          "third_party_sharing": false,
+                          "encryption_level": "AES-256"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": "work",
+      "street": "456 Business Ave",
+      "city": "San Francisco",
+      "details": {
+        "zip": "94105",
+        "country": "USA",
+        "contact_info": {
+          "phone": {
+            "primary": "415-555-0199",
+            "emergency": "415-555-0200",
+            "preferences": {
+              "call_time": "business_hours",
+              "notification_settings": {
+                "sms": false,
+                "email": true,
+                "push": {
+                  "enabled": false,
+                  "frequency": "weekly",
+                  "custom_rules": {
+                    "weekend": true,
+                    "holidays": true,
+                    "advanced_filters": {
+                      "location_based": false,
+                      "time_zone_aware": true,
+                      "user_behavior_analysis": {
+                        "tracking_enabled": false,
+                        "data_retention_days": 30,
+                        "privacy_settings": {
+                          "anonymize_data": true,
+                          "third_party_sharing": false,
+                          "encryption_level": "AES-128"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
+}

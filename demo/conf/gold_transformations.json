@@ -1,8 +1,8 @@
 [{
-	"target_table": "customers",
+	"target_table": "customers_gold",
 	"sources": [{
 		"reference_name": "customers_slv_vw",
-		"source_table": "catalog_dlt_meta.silver_schema.customers",
+		"source_table": "edap_dev.dlt_meta_silver_schema.customers_silver",
 		"filter_condition": "",
 		"is_streaming": "false",
 		"pii_fields":{
@@ -13,7 +13,7 @@
 	},
 	{
 		"reference_name": "transactions_slv_vw",
-		"source_table": "catalog_dlt_meta.silver_schema.transactions",
+		"source_table": "edap_dev.dlt_meta_silver_schema.transactions_silver",
 		"filter_condition": "year(transaction_date) >'2000'",
 		"is_streaming": "false",
 		"pii_fields": {

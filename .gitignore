@@ -152,9 +152,7 @@ deployment-merged.yaml
 .vscode/
 .databricks
 .databricks-login.json
-demo/conf/onboarding.json
 integration_tests/conf/onboarding*.json
-demo/conf/onboarding*.json
 integration_test_output*.csv
 databricks.yml
 oboarding_job_details.json

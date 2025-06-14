@@ -461,7 +461,7 @@ class DataflowPipeline:
 
     def write_to_delta(self):
         """Write to Delta."""
-        return dlt.read_stream(self.view_name)
+        return dlt.read(self.view_name)
     
     def encryptDataset(self, data: DataFrame, piiFields: dict, df_spec=None) -> DataFrame:
         """
