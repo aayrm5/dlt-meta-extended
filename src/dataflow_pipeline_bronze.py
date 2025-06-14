@@ -112,13 +112,13 @@ class BronzeDataflowPipeline:
             
     def recurFlattenDF(self, dfNested , arrayFieldToExtract = "", level = 0):
 
-        # PROTECTION 1: Maximum depth check
-        if level > 10:  # Prevent infinite recursion
+        # Maximum depth check
+        if level > 100:  # Prevent infinite recursion
             print(f"Maximum recursion depth reached at level {level}")
             print(f"Schema: {dfNested.schema.simpleString()}")
             return dfNested
         
-        # PROTECTION 2: Check if DataFrame is empty
+        # Check if DataFrame is empty
         if not dfNested.columns:
             return dfNested
 
@@ -189,12 +189,32 @@ class BronzeDataflowPipeline:
             return dfNested  # Base case: no more nested structures
         elif len(nested_cols) > 0:
         # Check if we're actually making progress
-            if level > 0:
-                current_nested = [f.name for f in dfNested.schema.fields if isinstance(f.dataType, (StructType, ArrayType))]
-                if len(current_nested) >= len(nested_cols):
-                    print(f"No progress at level {level}, stopping recursion")
-                    return dfNested
+            # if level > 0:
+            #     current_nested = [f.name for f in dfNested.schema.fields if isinstance(f.dataType, (StructType, ArrayType))]
+            #     if len(current_nested) >= len(nested_cols):
+            #         print(f"No progress at level {level}, stopping recursion")
+            #         return dfNested
             
             return self.recurFlattenDF(dfNested, arrayFieldToExtract, level + 1)
         else:
             return dfNested
+        
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

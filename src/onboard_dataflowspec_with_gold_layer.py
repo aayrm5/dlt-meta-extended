@@ -904,11 +904,20 @@ class OnboardDataflowspec:
                 onboarding_row, "bronze", env
             )
             
-            isStreaming = onboarding_row["isStreaming"]
+            if "isStreaming" in onboarding_row and onboarding_row["isStreaming"]:
+                isStreaming = onboarding_row["isStreaming"]
+            else:
+                isStreaming = None
+            
+            if "flattenNestedData" in onboarding_row and onboarding_row["flattenNestedData"]:
+                flattenNestedData = onboarding_row["flattenNestedData"]
+            else:
+                flattenNestedData = None
 
-            flattenNestedData = onboarding_row["flattenNestedData"]
-
-            columnToExtract = onboarding_row["columnToExtract"]
+            if "columnToExtract" in onboarding_row and onboarding_row["columnToExtract"]:
+                columnToExtract = onboarding_row["columnToExtract"]
+            else:
+                columnToExtract = None
 
             # ab_translator_config, ab_validation_rules, ab_message_types = self.process_ab_config(self, obnoring_row, env)
 
