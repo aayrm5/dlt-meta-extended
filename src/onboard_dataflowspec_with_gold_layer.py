@@ -1469,7 +1469,7 @@ class OnboardDataflowspec:
             # "dlt_views"
             "partitionColumns",
             "cdcApplyChanges",
-            # "dataQualityExpectations",
+            "dataQualityExpectations",
             "appendFlows", #check relevance
             "appendFlowsSchemas",
             "clusterBy",
@@ -1485,6 +1485,7 @@ class OnboardDataflowspec:
                 StructField("tableProperties", MapType(StringType(), StringType(), True), True),
                 StructField("partitionColumns", ArrayType(StringType(), True), True),
                 StructField("cdcApplyChanges", StringType(), True),
+                StructField("dataQualityExpectations", StringType(), True),
                 StructField("appendFlows", StringType(), True),
                 StructField("appendFlowsSchemas", MapType(StringType(), StringType(), True), True),
                 StructField("clusterBy", ArrayType(StringType(), True), True),
@@ -1602,7 +1603,7 @@ class OnboardDataflowspec:
                 gold_table_properties,
                 gold_parition_columns,
                 gold_cdc_apply_changes,
-                # data_quality_expectations,
+                data_quality_expectations,
                 append_flows,
                 append_flow_schemas,
                 gold_cluster_by,

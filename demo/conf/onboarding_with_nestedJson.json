@@ -56,7 +56,7 @@
          "address":"string"
       },
       "silver_cluster_by":["customer_id"],
-      "silver_transformation_json_prod": "file:/Workspace/Users/damanbansal@hkjccorpdev.onmicrosoft.com/aayrm5-dlt-meta/demo/conf/silver_transformations.json",
+      "silver_transformation_json_prod": "file:/Workspace/Users/damanbansal@hkjccorpdev.onmicrosoft.com/aayrm5-dlt-meta/demo/conf/silver_transformations_nestedJson.json",
       "silver_data_quality_expectations_json_prod": "file:/Workspace/Users/damanbansal@hkjccorpdev.onmicrosoft.com/aayrm5-dlt-meta/demo/conf/dqe/customers_silver_dqe.json",
       "is_streaming": "false",
       "gold_database_prod": "edap_dev.dlt_meta_gold_schema",
