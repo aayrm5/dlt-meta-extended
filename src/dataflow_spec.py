@@ -96,7 +96,7 @@ class GoldDataflowSpec:
     dlt_views: list
     partitionColumns: list
     cdcApplyChanges: str
-    # dataQualityExpectations: str
+    dataQualityExpectations: str
     appendFlows: str
     appendFlowsSchemas: map
     version: str

@@ -14,8 +14,7 @@
          "multiLine": "true"
       },
       "targetPiiFields" : {
-         "first_name":"string",
-         "last_name":"string"
+         "first_name":"string"
       },
       "bronze_cluster_by":["customer_id"],
       "bronze_data_quality_expectations_json_prod": "file:/Workspace/Users/damanbansal@hkjccorpdev.onmicrosoft.com/aayrm5-dlt-meta/demo/conf/dqe/customers_for_jsonFiles.json",
@@ -42,7 +41,6 @@
       },
       "source_PiiFields": {
          "first_name":"string",
-         "last_name":"string"
       },
       "target_PiiFields": {
          "full_name": "string"

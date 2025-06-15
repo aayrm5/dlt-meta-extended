@@ -157,7 +157,7 @@ class DataflowPipeline:
             gold_final_view = self.gold_pipeline.read()
             @dlt.view(name=self.view_name)
             def final_gold_view():
-                return dlt.read(gold_final_view)
+                return dlt.read_stream(gold_final_view)
         else:
             if not self.next_snapshot_and_version:
                 raise Exception("Dataflow read not supported for {}".format(type(self.dataflowSpec)))

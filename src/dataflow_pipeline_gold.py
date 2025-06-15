@@ -58,7 +58,7 @@ class GoldDataflowPipeline:
         if gold_dataflow_spec.isStreaming == "true":
             self.read_gold()
             return self.get_gold_dlt_views()
-        elif gold_dataflow_spec.isStreaming == "false":
+        else:
             self.read_gold_batch()
             return self.get_gold_dlt_views()
 

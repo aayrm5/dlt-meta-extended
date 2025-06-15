@@ -4,10 +4,10 @@
 		"reference_name": "customers_slv_vw",
 		"source_table": "edap_dev.dlt_meta_silver_schema.customers_silver",
 		"filter_condition": "",
-		"is_streaming": "false",
+		"is_streaming": "true",
 		"pii_fields":{
          "email": "string", 
-         "full_name": "string",
+         "first_name": "string",
          "address":"string"
       }
 	},
@@ -24,6 +24,6 @@
 	}],
 	"dlt_views": [{
 		"reference_name": "dlt_gold_v1",
-		"sql_condition": "select c.customer_id,c.full_name,c.email, t.transaction_id,t.transaction_date,t.product_id,t.store_id from live.customers_slv_vw c INNER JOIN live.transactions_slv_vw t on c.customer_id =t.customer_id"
+		"sql_condition": "select c.*, t.transaction_id,t.transaction_date,t.product_id,t.store_id from live.customers_slv_vw c INNER JOIN live.transactions_slv_vw t on c.customer_id =t.customer_id"
 	}]
 }]
