@@ -131,7 +131,6 @@ class DataflowPipeline:
         else:
             self.silver_schema = None
         
-        self.bronze_pipeline = BronzeDataflowPipeline(spark, dataflow_spec, view_name, view_name_quarantine, self.encryptDataset, self.decryptDataset)
         self.gold_pipeline = GoldDataflowPipeline(spark, dataflow_spec, view_name, view_name_quarantine, self.encryptDataset, self.decryptDataset)
 
     def table_has_expectations(self):
@@ -289,12 +288,12 @@ class DataflowPipeline:
 
         # ab_translator = ABCancelTranslatorPipeline(self.spark, bronze_dataflow_spec)
         if bronze_dataflow_spec.sourceFormat == "cloudFiles" and bronze_dataflow_spec.isStreaming == "true":
-            input_df = self.bronze_pipeline.read_source_streaming()
+            input_df = self.read_source_streaming()
         elif (bronze_dataflow_spec.sourceFormat == "csv" or bronze_dataflow_spec.sourceFormat == "parquet" or bronze_dataflow_spec.sourceFormat == "json" or bronze_dataflow_spec.sourceFormat == "delta" ):
             if bronze_dataflow_spec.isStreaming == "false":
-                input_df = self.bronze_pipeline.read_source_batch()
+                input_df = self.read_source_batch()
             else:
-                input_df = self.bronze_pipeline.read_source_streaming()
+                input_df = self.read_source_streaming()
             
         elif bronze_dataflow_spec.sourceFormat == "eventhub" or bronze_dataflow_spec.sourceFormat == "kafka":
             input_df = pipeline_reader.read_kafka()
@@ -404,60 +403,148 @@ class DataflowPipeline:
         
         return final_data
     
-    # def read_gold(self) -> DataFrame:
-    #     """Read Gold tables with PII decryption/encryption support using centralized functions."""
-    #     logger.info("In read_gold func with centralized PII decryption/encryption")
-    #     gold_dataflow_spec: GoldDataflowSpec = self.dataflowSpec
-    #     source_database = gold_dataflow_spec.sourceDetails["database"]
-    #     source_table = gold_dataflow_spec.sourceDetails["table"]
-    #     select_exp = gold_dataflow_spec.selectExp
-    #     where_clause = gold_dataflow_spec.whereClause
+    def read_source_streaming(self) -> DataFrame:
+        """Generic Method for to read raw data for autoloader based streaming paths for bronze tables
+        Returns:
+            dataframe to be persisted to bronze table"""
+        logger.info("In read_source_streaming func")
+        bronze_dataflow_spec: BronzeDataflowSpec = self.dataflowSpec
+        source_path = bronze_dataflow_spec.sourceDetails["path"]
+        reader_config_options = bronze_dataflow_spec.readerConfigOptions
+        if self.schema_json:
+            schema = StructType.fromJson(self.schema_json)
+
+            dataframe = self.spark.readStream.format(bronze_dataflow_spec.sourceFormat) \
+                    .options(**reader_config_options) \
+                    .schema(schema) \
+                    .load(source_path)
+        else:
+            dataframe = self.spark.readStream.format(bronze_dataflow_spec.sourceFormat)\
+                    .options(**reader_config_options)\
+                    .load(source_path)
+        if(bronze_dataflow_spec.flattenNestedData is not None and bronze_dataflow_spec.flattenNestedData == "true") :
+            if isinstance(bronze_dataflow_spec.columnToExtract, list):
+                column_to_extract = bronze_dataflow_spec.columnToExtract[0] if bronze_dataflow_spec.columnToExtract else ""
+            else:
+                column_to_extract = bronze_dataflow_spec.columnToExtract or ""
+            dataframe = self.recurFlattenDF(dataframe, bronze_dataflow_spec.columnToExtract)
+        return dataframe
+
+    def read_source_batch(self) -> DataFrame:
+        """Generic Method for to read raw data for CSV/Parquet/json/delta files for bronze tables
+        Returns:
+            dataframe to be persisted to bronze table"""
+        logger.info("In read_source_batch func")
+        bronze_dataflow_spec: BronzeDataflowSpec = self.dataflowSpec
+        source_path = bronze_dataflow_spec.sourceDetails["path"]
+        reader_config_options = bronze_dataflow_spec.readerConfigOptions
+        if self.schema_json:
+            schema = StructType.fromJson(self.schema_json)
+
+            dataframe = self.spark.read.format(bronze_dataflow_spec.sourceFormat) \
+                    .options(**reader_config_options) \
+                    .schema(schema) \
+                    .load(source_path)
+        else:
+            dataframe = self.spark.read.format(bronze_dataflow_spec.sourceFormat) \
+                    .options(**reader_config_options) \
+                    .load(source_path)
+        if(bronze_dataflow_spec.flattenNestedData is not None and bronze_dataflow_spec.flattenNestedData == "true") :
+            if isinstance(bronze_dataflow_spec.columnToExtract, list):
+                column_to_extract = bronze_dataflow_spec.columnToExtract[0] if bronze_dataflow_spec.columnToExtract else ""
+            else:
+                column_to_extract = bronze_dataflow_spec.columnToExtract or ""
+            dataframe = self.recurFlattenDF(dataframe, column_to_extract)
+        return dataframe
+            
+    def recurFlattenDF(self, dfNested , arrayFieldToExtract = "", level = 0):
+
+        # Maximum depth check
+        if level > 100:  # Prevent infinite recursion
+            print(f"Maximum recursion depth reached at level {level}")
+            print(f"Schema: {dfNested.schema.simpleString()}")
+            return dfNested
         
-    #     # Get PII field configurations
-    #     source_pii_fields = getattr(gold_dataflow_spec, 'gold_source_PiiFields', {})
-    #     target_pii_fields = getattr(gold_dataflow_spec, 'gold_target_PiiFields', {})
+        # Check if DataFrame is empty
+        if not dfNested.columns:
+            return dfNested
+
+        rootArrayTypeCounts = 0
+        arrayFieldNames = []
+
+        # Identify Array fields in the schema
+        print("--------------The level is level----------------"+str(level))
+        for field in dfNested.schema.fields:
+            if isinstance(field.dataType, ArrayType):
+                arrayFieldNames.append(field.name)
+                if(level == 0 ) :
+                    rootArrayTypeCounts = rootArrayTypeCounts + 1
+                
+                # Handle nested arrays (level > 0) when no specific field is targeted
+                if(level > 0 and arrayFieldToExtract == ""):
+                    # print("-------df count in arrayfield extract---------"+str(dfNested.count()))            
+                    dfNested = dfNested.withColumn(f"{field.name}",explode_outer(f"{field.name}"))
+                    # print(f"-------The rowCount after extract is --------"+str(dfNested.count()))
+
+        # Multiple Array Columns Scenario
+        if(((rootArrayTypeCounts > 1) or (rootArrayTypeCounts == 1 and len(dfNested.columns) > 1 )) and arrayFieldToExtract == "") :
+            raise ValueError(f"Detected multiple columns which cannot be flattened without providing column name to be extracted, array column names : {str(arrayFieldNames)} and dataset schema : {str(dfNested.columns)}")
+        # Single Array Column Scenario
+        elif (rootArrayTypeCounts == 1 and len(dfNested.columns) == 1 ):
+            dfNested = dfNested.withColumn(f"{arrayFieldNames[0]}",explode(f"{arrayFieldNames[0]}")).select(f"{arrayFieldNames[0]}.*")
+        # Specific Array Column Extraction
+        elif (arrayFieldToExtract != "" and arrayFieldToExtract in dfNested.columns and isinstance(dfNested.select(arrayFieldToExtract).schema.fields[0].dataType, ArrayType)):
+            dfNested = dfNested.withColumn(arrayFieldToExtract,explode(arrayFieldToExtract))
+            dfNestedlist = dfNested.columns
+            dfNestedlist.remove(arrayFieldToExtract)
+            dfNestedlist.append(f"{arrayFieldToExtract}.*")
+            dfNested = dfNested.select(dfNestedlist)
+            print("---------------in arraydata type case-------------------")
+            arrayFieldToExtract = ""  # Reset for next iteration
+        # Specific Struct Column Extraction
+        elif(arrayFieldToExtract != "" and arrayFieldToExtract in dfNested.columns and isinstance(dfNested.select(arrayFieldToExtract).schema.fields[0].dataType, StructType)):
+            dfNestedlist = dfNested.columns
+            dfNestedlist.remove(arrayFieldToExtract)
+            dfNestedlist.append(f"{arrayFieldToExtract}.*")
+            dfNested = dfNested.select(dfNestedlist)
+            arrayFieldToExtract = ""  # Reset for next iteration
+        # Handle other specified fields
+        elif(arrayFieldToExtract != "" and arrayFieldToExtract in dfNested.columns ):
+            dfNestedlist = dfNested.columns           
+            dfNested = dfNested.select(dfNestedlist)                     
+            arrayFieldToExtract = ""  # Reset for next iteration
+        # Flatten all StructType Fields
+        for field in dfNested.schema.fields:
+            if isinstance(field.dataType, StructType):
+                for nested_col in dfNested.select(f"{field.name}.*").columns:
+                    print(f"Flattening struct field: {field.name}.{nested_col}")
+                    # Create new column with flattened name
+                    dfNested = dfNested.withColumn(f"{field.name}_{nested_col}", col(f"{field.name}.{nested_col}"))
+                # Drop the original struct column
+                dfNested = dfNested.drop(field.name)
+
+        # print(f"DataFrame count after struct flattening: {dfNested.count()}")
+
+        # Check for remaining nested columns
+        nested_cols = []
+        for field in dfNested.schema.fields:
+            if isinstance(field.dataType, (StructType, ArrayType)):
+                nested_cols.append(field)
         
-    #     # Read source data from bronze layer
-    #     raw_delta_table_stream = self.spark.readStream.table(
-    #         f"{source_database}.{source_table}"
-    #     ) if self.uc_enabled else self.spark.readStream.load(
-    #         path=gold_dataflow_spec.sourceDetails["path"],
-    #         format="delta"
-    #     )
-        
-    #     # Decrypt source PII fields from silver layer
-    #     decrypted_data = raw_delta_table_stream
-    #     if source_pii_fields and len(source_pii_fields) > 0:
-    #         logger.info(f"Decrypting source PII fields from silver: {list(source_pii_fields.keys())}")
-    #         decrypted_data = self.decryptDataset(
-    #             data=raw_delta_table_stream,
-    #             piiFields=source_pii_fields
-    #         )
-    #         logger.info("Source PII decryption completed for gold layer")
-    #     else:
-    #         logger.info("No source PII fields configured for decryption in gold layer")
-        
-    #     # Apply transformations 
-    #     transformed_data = decrypted_data.selectExpr(*select_exp)
-    #     transformed_data = self.__apply_where_clause(where_clause, transformed_data)
-        
-    #     # Apply custom transformations 
-    #     transformed_data = self.apply_custom_transform_fun(transformed_data)
-        
-    #     # ncrypt target PII fields for gold layer 
-    #     final_data = transformed_data
-    #     if target_pii_fields and len(target_pii_fields) > 0:
-    #         logger.info(f"Applying PII encryption to silver layer fields: {list(target_pii_fields.keys())}")
-    #         final_data = self.encryptDataset(
-    #             data=transformed_data,
-    #             piiFields=target_pii_fields,
-    #             df_spec=gold_dataflow_spec
-    #         )
-    #         logger.info("Target PII encryption completed for gold layer")
-    #     else:
-    #         logger.info("No target PII fields configured for encryption in gold layer")
-        
-    #     return final_data
+        # Step 10: Recursive call or return
+        if len(nested_cols) == 0:
+            return dfNested  # Base case: no more nested structures
+        elif len(nested_cols) > 0:
+        # Check if we're actually making progress
+            # if level > 0:
+            #     current_nested = [f.name for f in dfNested.schema.fields if isinstance(f.dataType, (StructType, ArrayType))]
+            #     if len(current_nested) >= len(nested_cols):
+            #         print(f"No progress at level {level}, stopping recursion")
+            #         return dfNested
+            
+            return self.recurFlattenDF(dfNested, arrayFieldToExtract, level + 1)
+        else:
+            return dfNested
 
     def write_to_delta(self):
         """Write to Delta."""

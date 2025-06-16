@@ -197,6 +197,7 @@ class PipelineReaders:
                 raise Exception(f"Kafka ssl required params are: {params}! provided options are :{self.source_details}")
         else:
             kafka_options = {**kafka_base_ops, **self.reader_config_options}
+        print("Riyaz-------" + str(kafka_options))
         return kafka_options
 
     def read_ab_binary_messages(self) -> DataFrame:

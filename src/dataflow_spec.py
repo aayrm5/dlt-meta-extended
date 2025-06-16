@@ -33,6 +33,7 @@ class BronzeDataflowSpec:
     dataQualityExpectations: str
     quarantineTargetDetails: map
     quarantineTableProperties: map
+    writerConfigOptions: map
     appendFlows: str
     appendFlowsSchemas: map
     version: str
@@ -45,6 +46,9 @@ class BronzeDataflowSpec:
     isStreaming: str
     flattenNestedData: str
     columnToExtract: list
+    version: str
+    description: str
+    # metadata: map
     # abTranslatorConfig: map = None
     # abValidataionRules: map = None
     # abMessageTypes: List = None
