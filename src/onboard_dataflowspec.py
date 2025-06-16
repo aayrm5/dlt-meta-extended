@@ -1,4 +1,4 @@
-"""OnboardDataflowSpec class provides bronze/silver onboarding features."""
+"""OnboardDataflowSpec class provides bronze/silver/gold onboarding features with flexible layer selection."""
 
 import copy
 import dataclasses
@@ -17,7 +17,7 @@ logger.setLevel(logging.INFO)
 
 
 class OnboardDataflowspec:
-    """OnboardDataflowSpec class provides bronze/silver onboarding features."""
+    """OnboardDataflowSpec class provides bronze/silver/gold onboarding features with flexible layer selection."""
 
     def __init__(self, spark, dict_obj, bronze_schema_mapper=None, uc_enabled=False):
         """Onboard Dataflowspec Constructor."""
@@ -27,51 +27,96 @@ class OnboardDataflowspec:
         self.silver_dict_obj = copy.deepcopy(dict_obj)
         self.gold_dict_obj = copy.deepcopy(dict_obj)
         self.uc_enabled = uc_enabled
+        
+        # Determine which layers to onboard based on available specifications
+        self.layers_to_onboard = self._determine_layers_to_onboard()
+        logger.info(f"Layers to onboard: {self.layers_to_onboard}")
+        
         self.__initialize_paths(uc_enabled)
         self.bronze_schema_mapper = bronze_schema_mapper
         self.deltaPipelinesMetaStoreOps = DeltaPipelinesMetaStoreOps(self.spark)
         self.deltaPipelinesInternalTableOps = DeltaPipelinesInternalTableOps(self.spark)
         self.onboard_file_type = None
 
-    def __initialize_paths(self, uc_enabled):
-        if "silver_dataflowspec_table" in self.bronze_dict_obj:
-            del self.bronze_dict_obj["silver_dataflowspec_table"]
-        if "silver_dataflowspec_path" in self.bronze_dict_obj:
-            del self.bronze_dict_obj["silver_dataflowspec_path"]
-        if "gold_dataflowspec_table" in self.bronze_dict_obj:
-            del self.bronze_dict_obj["gold_dataflowspec_table"]
-        if "gold_dataflowspec_path" in self.bronze_dict_obj:
-            del self.bronze_dict_obj["gold_dataflowspec_path"]
-
-        if "bronze_dataflowspec_table" in self.silver_dict_obj:
-            del self.silver_dict_obj["bronze_dataflowspec_table"]
-        if "bronze_dataflowspec_path" in self.silver_dict_obj:
-            del self.silver_dict_obj["bronze_dataflowspec_path"]
-        if "gold_dataflowspec_table" in self.silver_dict_obj:
-            del self.silver_dict_obj["gold_dataflowspec_table"]
-        if "gold_dataflowspec_path" in self.silver_dict_obj:
-            del self.silver_dict_obj["gold_dataflowspec_path"]
-
-        if "bronze_dataflowspec_table" in self.gold_dict_obj:
-            del self.gold_dict_obj["bronze_dataflowspec_table"]
-        if "bronze_dataflowspec_path" in self.gold_dict_obj:
-            del self.gold_dict_obj["bronze_dataflowspec_path"]
-        if "silver_dataflowspec_table" in self.gold_dict_obj:
-            del self.gold_dict_obj["silver_dataflowspec_table"]
-        if "silver_dataflowspec_path" in self.gold_dict_obj:
-            del self.gold_dict_obj["silver_dataflowspec_path"]
-
+    def _determine_layers_to_onboard(self):
+        """
+        Determine which layers (bronze, silver, gold) should be onboarded based on available specifications.
         
+        Returns:
+            list: List of layers to onboard ('bronze', 'silver', 'gold')
+        """
+        layers = []
+        
+        # Check for bronze layer
+        if any(key in self.dict_obj for key in ['bronze_dataflowspec_table', 'bronze_dataflowspec_path']):
+            layers.append('bronze')
+        
+        # Check for silver layer
+        if any(key in self.dict_obj for key in ['silver_dataflowspec_table', 'silver_dataflowspec_path']):
+            layers.append('silver')
+            
+        # Check for gold layer
+        if any(key in self.dict_obj for key in ['gold_dataflowspec_table', 'gold_dataflowspec_path']):
+            layers.append('gold')
+        
+        # If no specific layers detected, check for any data in onboarding file
+        if not layers and 'onboarding_file_path' in self.dict_obj:
+            try:
+                # Try to read the onboarding file to determine available layers
+                onboarding_df = self.__get_onboarding_file_dataframe(self.dict_obj['onboarding_file_path'])
+                sample_row = onboarding_df.first()
+                
+                # Check for bronze indicators
+                if any(col in onboarding_df.columns for col in ['bronze', 'source_details', 'bronze_reader_options']):
+                    layers.append('bronze')
+                
+                # Check for silver indicators  
+                if sample_row and any('silver' in col.lower() for col in onboarding_df.columns):
+                    layers.append('silver')
+                    
+                # Check for gold indicators
+                if sample_row and any('gold' in col.lower() for col in onboarding_df.columns):
+                    layers.append('gold')
+            except Exception as e:
+                logger.warning(f"Could not auto-determine layers from onboarding file: {e}")
+                # Default to bronze if nothing else is specified
+                layers = ['bronze']
+        
+        return layers if layers else ['bronze']  # Default to bronze if nothing detected
 
+    def __initialize_paths(self, uc_enabled):
+        """Initialize paths by removing irrelevant path configurations based on layers to onboard."""
+        
+        # For bronze dict, remove silver and gold specifications
+        if 'bronze' in self.layers_to_onboard:
+            for key in ['silver_dataflowspec_table', 'silver_dataflowspec_path', 
+                       'gold_dataflowspec_table', 'gold_dataflowspec_path']:
+                if key in self.bronze_dict_obj:
+                    del self.bronze_dict_obj[key]
+        
+        # For silver dict, remove bronze and gold specifications  
+        if 'silver' in self.layers_to_onboard:
+            for key in ['bronze_dataflowspec_table', 'bronze_dataflowspec_path',
+                       'gold_dataflowspec_table', 'gold_dataflowspec_path']:
+                if key in self.silver_dict_obj:
+                    del self.silver_dict_obj[key]
+        
+        # For gold dict, remove bronze and silver specifications
+        if 'gold' in self.layers_to_onboard:
+            for key in ['bronze_dataflowspec_table', 'bronze_dataflowspec_path',
+                       'silver_dataflowspec_table', 'silver_dataflowspec_path']:
+                if key in self.gold_dict_obj:
+                    del self.gold_dict_obj[key]
+
+        # Handle UC-specific path removal
         if uc_enabled:
             print("uc_enabled:", uc_enabled)
-            if "bronze_dataflowspec_path" in self.bronze_dict_obj:
+            if 'bronze' in self.layers_to_onboard and "bronze_dataflowspec_path" in self.bronze_dict_obj:
                 del self.bronze_dict_obj["bronze_dataflowspec_path"]
-            if "silver_dataflowspec_path" in self.silver_dict_obj:
+            if 'silver' in self.layers_to_onboard and "silver_dataflowspec_path" in self.silver_dict_obj:
                 del self.silver_dict_obj["silver_dataflowspec_path"]
-            if "gold_dataflowspec_path" in self.gold_dict_obj:
+            if 'gold' in self.layers_to_onboard and "gold_dataflowspec_path" in self.gold_dict_obj:
                 del self.gold_dict_obj["gold_dataflowspec_path"]
-
 
     @staticmethod
     def __validate_dict_attributes(attributes, dict_obj):
@@ -97,59 +142,108 @@ class OnboardDataflowspec:
                 f"missing attributes : {set(attributes).difference(attributes_keys)}"
             )
 
-    def onboard_dataflow_specs(self):
+    def _validate_layer_specific_attributes(self, layer):
         """
-        Onboard_dataflow_specs method will onboard dataFlowSpecs for bronze, silver and gold.
-
-        This method takes in a SparkSession object and a dictionary object containing the following attributes:
-        - onboarding_file_path: The path to the onboarding file.
-        - database: The name of the database to onboard the dataflow specs to.
-        - env: The environment to onboard the dataflow specs to.
-        - bronze_dataflowspec_table: The name of the bronze dataflow specs table.
-        - bronze_dataflowspec_path: The path to the bronze dataflow specs.
-        - silver_dataflowspec_table: The name of the silver dataflow specs table.
-        - silver_dataflowspec_path: The path to the silver dataflow specs.
-        - import_author: The author of the import.
-        - version: The version of the import.
-        - overwrite: Whether to overwrite existing dataflow specs or not.
-
-        If the `uc_enabled` flag is set to True, the dictionary object must contain all the attributes listed above.
-        If the `uc_enabled` flag is set to False, the dictionary object must contain all the attributes listed above
-        except for `bronze_dataflowspec_path` and `silver_dataflowspec_path`.
-
-        This method calls the `onboard_bronze_dataflow_spec` and `onboard_silver_dataflow_spec` methods to onboard
-        the bronze and silver dataflow specs respectively.
+        Validate attributes specific to a layer.
+        
+        Args:
+            layer (str): Layer name ('bronze', 'silver', 'gold')
         """
-
-        attributes = [
+        base_attributes = [
             "database",
-            "onboarding_file_path",
-            "bronze_dataflowspec_table",
-            "silver_dataflowspec_table",
-            "gold_dataflowspec_table",
+            "onboarding_file_path", 
             "overwrite",
             "env",
             "version",
             "import_author" 
         ]
-        if self.uc_enabled:
-            if "bronze_dataflowspec_path" in self.dict_obj:
-                del self.dict_obj["bronze_dataflowspec_path"]
-            if "silver_dataflowspec_path" in self.dict_obj:
-                del self.dict_obj["silver_dataflowspec_path"]
-            if "gold_dataflowspec_path" in self.dict_obj:
-                del self.dict_obj["gold_dataflowspec_path"]
-            print(f"attributes: {attributes}")
-            print(f"dict_obj: {self.dict_obj}")
-            self.__validate_dict_attributes(attributes, self.dict_obj)
-        else:
-            attributes.append("bronze_dataflowspec_path")
-            attributes.append("silver_dataflowspec_path")
-            attributes.append("gold_dataflowspec_path")
-            self.__validate_dict_attributes(attributes, self.dict_obj)
-        self.onboard_bronze_dataflow_spec()
-        # self.onboard_silver_dataflow_spec()
-        # self.onboard_gold_dataflow_spec()
+        
+        # Add layer-specific attributes
+        if layer == 'bronze':
+            base_attributes.append("bronze_dataflowspec_table")
+            if not self.uc_enabled:
+                base_attributes.append("bronze_dataflowspec_path")
+        elif layer == 'silver':
+            base_attributes.append("silver_dataflowspec_table") 
+            if not self.uc_enabled:
+                base_attributes.append("silver_dataflowspec_path")
+        elif layer == 'gold':
+            base_attributes.append("gold_dataflowspec_table")
+            if not self.uc_enabled:
+                base_attributes.append("gold_dataflowspec_path")
+        
+        # Validate against the appropriate dict object
+        if layer == 'bronze':
+            self.__validate_dict_attributes(base_attributes, self.bronze_dict_obj)
+        elif layer == 'silver':
+            self.__validate_dict_attributes(base_attributes, self.silver_dict_obj)  
+        elif layer == 'gold':
+            self.__validate_dict_attributes(base_attributes, self.gold_dict_obj)
+
+    def onboard_dataflow_specs(self):
+        """
+        Onboard_dataflow_specs method will onboard dataFlowSpecs for the determined layers.
+
+        This method dynamically onboards only the layers that have been specified in the configuration.
+        It validates each layer's requirements independently and only processes the relevant layers.
+        """
+        
+        # Validate attributes for each layer that will be onboarded
+        for layer in self.layers_to_onboard:
+            try:
+                self._validate_layer_specific_attributes(layer)
+                logger.info(f"Validation successful for {layer} layer")
+            except ValueError as e:
+                logger.error(f"Validation failed for {layer} layer: {e}")
+                raise
+
+        # Onboard each layer based on the determined layers
+        if 'bronze' in self.layers_to_onboard:
+            logger.info("Starting bronze dataflow spec onboarding...")
+            self.onboard_bronze_dataflow_spec()
+            
+        if 'silver' in self.layers_to_onboard:
+            logger.info("Starting silver dataflow spec onboarding...")
+            self.onboard_silver_dataflow_spec()
+            
+        if 'gold' in self.layers_to_onboard:
+            logger.info("Starting gold dataflow spec onboarding...")
+            self.onboard_gold_dataflow_spec()
+
+    def _validate_onboarding_data_for_layer(self, onboarding_df, layer, env):
+        """
+        Validate that the onboarding dataframe contains required data for the specified layer.
+        
+        Args:
+            onboarding_df: The onboarding dataframe
+            layer (str): Layer name ('bronze', 'silver', 'gold')
+            env (str): Environment name
+            
+        Returns:
+            bool: True if data is available for the layer
+        """
+        try:
+            sample_row = onboarding_df.first()
+            if not sample_row:
+                return False
+                
+            if layer == 'bronze':
+                required_fields = ['data_flow_id', 'data_flow_group', 'source_details', 'bronze']
+                return all(field in sample_row and sample_row[field] is not None for field in required_fields)
+                
+            elif layer == 'silver':
+                required_fields = ['data_flow_id', 'data_flow_group', f'silver_database_{env}', 'silver_table']
+                return all(field in sample_row and sample_row[field] is not None for field in required_fields)
+                
+            elif layer == 'gold':
+                required_fields = ['data_flow_id', 'data_flow_group', f'gold_database_{env}', 'gold_table']
+                return all(field in sample_row and sample_row[field] is not None for field in required_fields)
+                
+        except Exception as e:
+            logger.warning(f"Could not validate onboarding data for {layer}: {e}")
+            return False
+        
+        return False
 
     def register_bronze_dataflow_spec_tables(self):
         """Register bronze/silver dataflow specs tables."""
@@ -205,27 +299,12 @@ class OnboardDataflowspec:
     def onboard_bronze_dataflow_spec(self):
         """
         Onboard bronze dataflow spec.
-
-        This function reads the onboarding file and creates bronze dataflow spec. It adds audit columns to the dataframe
-        If overwrite is True, it overwrites the table or file with the new dataframe. If overwrite is False,
-        it merges the new dataframe with the existing dataframe.
-        dict_obj (dict): Dictionary containing the required attributes for onboarding bronze dataflow spec.
-            Required attributes:
-                - onboarding_file_path (str): Path of the onboarding file.
-                - database (str): Name of the database.
-                - env (str): Environment name.
-                - bronze_dataflowspec_table (str): Name of the bronze dataflow spec table.
-                - bronze_dataflowspec_path (str): Path of the bronze dataflow spec file. if uc_enabled is False
-                - import_author (str): Name of the import author.
-                - version (str): Version of the dataflow spec.
-                - overwrite (str): Whether to overwrite the existing dataflow spec table/file or not.
-
-        Args:
-            None
-
-        Returns:
-            None
+        Modified to only process if bronze layer is in the layers to onboard.
         """
+        if 'bronze' not in self.layers_to_onboard:
+            logger.info("Bronze layer not selected for onboarding, skipping...")
+            return
+            
         attributes = [
             "onboarding_file_path",
             "database",
@@ -245,6 +324,10 @@ class OnboardDataflowspec:
         onboarding_df = self.__get_onboarding_file_dataframe(
             dict_obj["onboarding_file_path"]
         )
+
+        # Validate that the onboarding data contains bronze information
+        if not self._validate_onboarding_data_for_layer(onboarding_df, 'bronze', dict_obj["env"]):
+            raise Exception("Onboarding file does not contain valid bronze layer data")
 
         bronze_dataflow_spec_df = self.__get_bronze_dataflow_spec_dataframe(
             onboarding_df, dict_obj["env"]
@@ -299,24 +382,16 @@ class OnboardDataflowspec:
             )
         if not self.uc_enabled:
             self.register_bronze_dataflow_spec_tables()
-    
+
     def onboard_silver_dataflow_spec(self):
         """
         Onboard silver dataflow spec.
-
-        Args:
-            onboarding_df (pyspark.sql.DataFrame): DataFrame containing the onboarding file data.
-            dict_obj (dict): Dictionary containing the required attributes for onboarding silver dataflow spec.
-                Required attributes:
-                    - onboarding_file_path (str): Path of the onboarding file.
-                    - database (str): Name of the database.
-                    - env (str): Environment name.
-                    - silver_dataflowspec_table (str): Name of the silver dataflow spec table.
-                    - silver_dataflowspec_path (str): Path of the silver dataflow spec file. if uc_enabled is False
-                    - import_author (str): Name of the import author.
-                    - version (str): Version of the dataflow spec.
-                    - overwrite (str): Whether to overwrite the existing dataflow spec table/file or not.
+        Modified to only process if silver layer is in the layers to onboard.
         """
+        if 'silver' not in self.layers_to_onboard:
+            logger.info("Silver layer not selected for onboarding, skipping...")
+            return
+            
         attributes = [
             "onboarding_file_path",
             "database",
@@ -336,6 +411,11 @@ class OnboardDataflowspec:
         onboarding_df = self.__get_onboarding_file_dataframe(
             dict_obj["onboarding_file_path"]
         )
+        
+        # Validate that the onboarding data contains silver information
+        if not self._validate_onboarding_data_for_layer(onboarding_df, 'silver', dict_obj["env"]):
+            raise Exception("Onboarding file does not contain valid silver layer data")
+            
         silver_data_flow_spec_df = self.__get_silver_dataflow_spec_dataframe(
             onboarding_df, dict_obj["env"]
         )
@@ -428,23 +508,16 @@ class OnboardDataflowspec:
         if not self.uc_enabled:
             self.register_silver_dataflow_spec_tables()
 
+
     def onboard_gold_dataflow_spec(self):
         """
         Onboard gold dataflow spec.
-
-        Args:
-            onboarding_df (pyspark.sql.DataFrame): DataFrame containing the onboarding file data.
-            dict_obj (dict): Dictionary containing the required attributes for onboarding silver dataflow spec.
-                Required attributes:
-                    - onboarding_file_path (str): Path of the onboarding file.
-                    - database (str): Name of the database.
-                    - env (str): Environment name.
-                    - gold_dataflowspec_table (str): Name of the silver dataflow spec table.
-                    - gold_dataflowspec_path (str): Path of the silver dataflow spec file. if uc_enabled is False
-                    - import_author (str): Name of the import author.
-                    - version (str): Version of the dataflow spec.
-                    - overwrite (str): Whether to overwrite the existing dataflow spec table/file or not.
+        Modified to only process if gold layer is in the layers to onboard.
         """
+        if 'gold' not in self.layers_to_onboard:
+            logger.info("Gold layer not selected for onboarding, skipping...")
+            return
+            
         attributes = [
             "onboarding_file_path",
             "database",
@@ -464,6 +537,11 @@ class OnboardDataflowspec:
         onboarding_df = self.__get_onboarding_file_dataframe(
             dict_obj["onboarding_file_path"]
         )
+        
+        # Validate that the onboarding data contains gold information
+        if not self._validate_onboarding_data_for_layer(onboarding_df, 'gold', dict_obj["env"]):
+            raise Exception("Onboarding file does not contain valid gold layer data")
+            
         gold_data_flow_spec_df = self.__get_gold_dataflow_spec_dataframe(
             onboarding_df, dict_obj["env"]
         )
@@ -735,7 +813,7 @@ class OnboardDataflowspec:
             "columnToExtract",
             "version",
             "description",
-            # "metadata"
+            "metadata",
             # "abTranslatorConfig",
             # "abValidationRules", 
             # "abMessageTypes",
@@ -784,7 +862,16 @@ class OnboardDataflowspec:
                 StructField("columnToExtract", ArrayType(StringType(), True), True),
                 StructField("version", StringType(), True),
                 StructField("description", StringType(), True),
-                # StructField("metadata", MapType(StringType(), StringType(), True), True),
+                StructField("metadata", StructType([
+                    StructField("created_by", StringType(), True),
+                    StructField("created_date", StringType(), True),
+                    StructField("last_modified", StringType(), True),
+                    StructField("business_owner", StringType(), True),
+                    StructField("data_classification", StringType(), True),
+                    StructField("retention_policy", StringType(), True),
+                    StructField("compliance_requirements", StringType(), True),
+                    StructField("tags", StringType(), True)
+                ]), True)
                 # StructField("abTranslatorConfig", MapType(StringType(), StringType(), True), True),
                 # StructField("abValidationRules", MapType(StringType(), StringType(), True), True),
                 # StructField("abMessageTypes", ArrayType(StringType(), True), True),
@@ -941,10 +1028,10 @@ class OnboardDataflowspec:
             else:
                 description = None
 
-            # if "metadata" in onboarding_row and onboarding_row["metadata"]:
-            #     metadata = onboarding_row["metadata"]
-            # else:
-            #     metadata = None
+            if "metadata" in onboarding_row and onboarding_row["metadata"]:
+                metadata = onboarding_row["metadata"]
+            else:
+                metadata = None
             
 
             # ab_translator_config, ab_validation_rules, ab_message_types = self.process_ab_config(self, obnoring_row, env)
@@ -975,7 +1062,7 @@ class OnboardDataflowspec:
                 columnToExtract,
                 version,
                 description,
-                # metadata
+                metadata,
                 # ab_translator_config,
                 # ab_validation_rules,
                 # ab_message_types

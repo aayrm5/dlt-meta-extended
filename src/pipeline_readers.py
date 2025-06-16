@@ -170,7 +170,8 @@ class PipelineReaders:
         """Get kafka options from dataflowspec."""
         kafka_base_ops = {
             "kafka.bootstrap.servers": self.source_details.get("kafka.bootstrap.servers"),
-            "subscribe": self.source_details.get("subscribe")
+            "subscribe": self.source_details.get("subscribe"),
+            "kafka.security.protocol": self.source_details.get("kafka.security.protocol")
         }
         ssl_truststore_location = self.source_details.get("kafka.ssl.truststore.location", None)
         ssl_keystore_location = self.source_details.get("kafka.ssl.keystore.location", None)

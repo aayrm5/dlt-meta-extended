@@ -48,7 +48,7 @@ class BronzeDataflowSpec:
     columnToExtract: list
     version: str
     description: str
-    # metadata: map
+    metadata: map
     # abTranslatorConfig: map = None
     # abValidataionRules: map = None
     # abMessageTypes: List = None

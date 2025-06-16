@@ -11,7 +11,6 @@ from src.__about__ import __version__
 from src.dataflow_spec import BronzeDataflowSpec, SilverDataflowSpec, GoldDataflowSpec, DataflowSpecUtils
 from src.pipeline_readers import PipelineReaders
 from src.ab_cancel_translator_integration import ABCancelTranslatorPipeline
-from src.dataflow_pipeline_bronze import BronzeDataflowPipeline
 from src.dataflow_pipeline_gold import GoldDataflowPipeline,GoldSourceProcessingUtils,GoldDltViewUtils
 
 logger = logging.getLogger('databricks.labs.dltmeta')
@@ -289,6 +288,7 @@ class DataflowPipeline:
         # ab_translator = ABCancelTranslatorPipeline(self.spark, bronze_dataflow_spec)
         if bronze_dataflow_spec.sourceFormat == "cloudFiles" and bronze_dataflow_spec.isStreaming == "true":
             input_df = self.read_source_streaming()
+
         elif (bronze_dataflow_spec.sourceFormat == "csv" or bronze_dataflow_spec.sourceFormat == "parquet" or bronze_dataflow_spec.sourceFormat == "json" or bronze_dataflow_spec.sourceFormat == "delta" ):
             if bronze_dataflow_spec.isStreaming == "false":
                 input_df = self.read_source_batch()
@@ -297,6 +297,7 @@ class DataflowPipeline:
             
         elif bronze_dataflow_spec.sourceFormat == "eventhub" or bronze_dataflow_spec.sourceFormat == "kafka":
             input_df = pipeline_reader.read_kafka()
+
         # elif bronze_dataflow_spec.sourceFormat.lower() in ["ab_binary_messages", "ab_cancel_messages"]:
         # # Handle AB message formats
         #     input_df = pipeline_reader.read_ab_binary_messages()  # Assume binary files
