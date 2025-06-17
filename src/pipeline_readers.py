@@ -2,12 +2,30 @@
 import logging
 import json
 from pyspark.sql import DataFrame
-from pyspark.sql.types import StructType
-from pyspark.sql.functions import from_json, col
+from pyspark.sql.types import StructType, StructField, StringType, BooleanType
+from pyspark.sql.functions import from_json, col, current_timestamp, udf, expr, map_from_entries
+from src.onboard_dataflowspec import OnboardDataflowspec
+from src.dataflow_spec import BronzeDataflowSpec
+from src.dataflow_utils import DataflowUtils
 
 logger = logging.getLogger('databricks.labs.dltmeta')
 logger.setLevel(logging.INFO)
 
+def validate_json_with_error(json_str):
+    """Validate JSON string and return error details if invalid."""
+    try:
+        json.loads(json_str)
+        return (False, None)
+    except Exception as e:
+        return (True, str(e))
+        
+# Define the schema of the struct returned by the UDF
+result_schema = StructType([
+StructField("is_error", BooleanType(), nullable=False),
+StructField("error_details", StringType(), nullable=True)
+])
+
+validate_json_udf = udf(validate_json_with_error, result_schema)
 
 class PipelineReaders:
     """PipelineReader Class.
@@ -15,13 +33,18 @@ class PipelineReaders:
     Returns:
         _type_: _description_
     """
-    def __init__(self, spark, source_format, source_details, reader_config_options, schema_json=None):
+    def __init__(self, spark, source_format, source_details, reader_config_options, dataflowSpec, schema_json=None, writer_config_options=None):
         """Init."""
         self.spark = spark
         self.source_format = source_format
         self.source_details = source_details
         self.reader_config_options = reader_config_options
         self.schema_json = schema_json
+        self.writer_config_options = writer_config_options
+        # Register the UDF with Spark session
+        self.spark.udf.register("validate_json_udf", validate_json_with_error, result_schema)
+        self.dataflowSpec = dataflowSpec
+        bronze_dataflow_spec: BronzeDataflowSpec = self.dataflowSpec
 
     def read_dlt_cloud_files(self) -> DataFrame:
         """Read dlt cloud files.
@@ -48,6 +71,8 @@ class PipelineReaders:
             )
         if self.source_details and "source_metadata" in self.source_details.keys():
             input_df = PipelineReaders.add_cloudfiles_metadata(self.source_details, input_df)
+        if self.writer_config_options["includeIngestionTimeAsColumn"] == "true":
+            input_df = input_df.withColumn("databricksIngestionTimestamp", current_timestamp())
         return input_df
 
     @staticmethod
@@ -87,19 +112,22 @@ class PipelineReaders:
         logger.info("In read_dlt_cloud_files func")
 
         if self.reader_config_options and len(self.reader_config_options) > 0:
-            return (
-                self.spark.readStream.options(**self.reader_config_options).table(
-                    f"""{self.source_details["source_database"]}
-                        .{self.source_details["source_table"]}"""
-                )
+            input_df = (self.spark.readStream.options(**self.reader_config_options).table(
+                        f"""{self.source_details["source_database"]}
+                            .{self.source_details["source_table"]}"""
+                    )
             )
+            
         else:
-            return (
+            input_df = (
                 self.spark.readStream.table(
                     f"""{self.source_details["source_database"]}
                         .{self.source_details["source_table"]}"""
                 )
             )
+        if self.writer_config_options["includeIngestionTimeAsColumn"] == "true":
+            input_df = input_df.withColumn("databricksIngestionTimestamp", current_timestamp())
+        return input_df
 
     def get_db_utils(self):
         """Get databricks utils using DBUtils package."""
@@ -117,26 +145,89 @@ class PipelineReaders:
         Returns:
             DataFrame: _description_
         """
+        bronze_dataflow_spec: BronzeDataflowSpec = self.dataflowSpec
+        
+        if "source_schema_path" in self.source_details:
+            schema_path = self.source_details.get("source_schema_path")
+            kafka_source_schema = DataflowUtils.get_bronze_schema(self, schema_path)
+
         if self.source_format == "eventhub":
             kafka_options = self.get_eventhub_kafka_options()
         elif self.source_format == "kafka":
             kafka_options = self.get_kafka_options()
-        raw_df = (
-            self.spark
-            .readStream
-            .format("kafka")
-            .options(**kafka_options)
-            .load()
-            # add date, hour, and minute columns derived from eventhub enqueued timestamp
-            .selectExpr("*", "to_date(timestamp) as date", "hour(timestamp) as hour", "minute(timestamp) as minute")
-        )
-        if self.schema_json:
-            schema = StructType.fromJson(self.schema_json)
-            return (
-                raw_df.withColumn("parsed_records", from_json(col("value").cast("string"), schema))
-            )
+
+        keys_to_remove = {"custom_decode_fo", "custom_decode_trasaction_type"}
+        custom_removed_kafka_options = {k: v for k, v in kafka_options.items() if k not in keys_to_remove}
+
+        if "custom_decode_fo" in kafka_options and kafka_options["custom_decode_fo"] == "true":
+            if kafka_options["custom_decode_trasaction_type"] == "BET_FO":
+                raw_df = (
+                    self.spark
+                    .readStream
+                    .format("kafka")
+                    .options(**custom_removed_kafka_options)
+                    .load()
+                    .withColumn("decoded_value",expr("decode(value, 'utf-8')"))
+                    .withColumn("validJson", expr("validate_json_udf(decoded_value)"))
+                    .withColumn("jsonValue", from_json(col("decoded_value"),kafka_source_schema ))
+                    .withColumn("headersRefined", expr("map_from_entries(headers)"))
+                    .withColumn("kafkaMessageTimestamp", col("timestamp"))
+                    .withColumn("kafkaTopic", col("topic"))
+                    .withColumn("kafkaPartition", col("partition"))
+                    .withColumn("kafkaOffset", col("offset"))
+                    .selectExpr("kafkaOffset","kafkaMessageTimestamp","kafkaTopic","kafkaPartition","headersRefined", "jsonValue.*")
+                )
+                if(bronze_dataflow_spec.flattenNestedData is not None and bronze_dataflow_spec.flattenNestedData == "true") :
+                    if isinstance(bronze_dataflow_spec.columnToExtract, list):
+                        column_to_extract = bronze_dataflow_spec.columnToExtract[0] if bronze_dataflow_spec.columnToExtract else ""
+                    else:
+                        column_to_extract = bronze_dataflow_spec.columnToExtract or ""
+                    raw_df = DataflowUtils.recurFlattenDF(raw_df, bronze_dataflow_spec.columnToExtract)
+                raw_df.filter("activityType = 1")
+                
+            elif kafka_options["custom_decode_trasaction_type"] == "BET_FO_CANCEL":
+                raw_df = (
+                    self.spark
+                    .readStream
+                    .format("kafka")
+                    .options(**custom_removed_kafka_options)
+                    .load()
+                    .withColumn("decoded_value",expr("decode(value, 'utf-8')"))
+                    .withColumn("validJson", expr("validate_json_udf(decoded_value)"))
+                    .withColumn("jsonValue", from_json(col("decoded_value"),kafka_source_schema ))
+                    .withColumn("headersRefined", expr("map_from_entries(headers)"))
+                    .withColumn("kafkaMessageTimestamp", col("timestamp"))
+                    .withColumn("kafkaTopic", col("topic"))
+                    .withColumn("kafkaPartition", col("partition"))
+                    .withColumn("kafkaOffset", col("offset"))
+                    .selectExpr("kafkaOffset","kafkaMessageTimestamp","kafkaTopic","kafkaPartition","headersRefined", "jsonValue.*")
+                )
+                if(bronze_dataflow_spec.flattenNestedData is not None and bronze_dataflow_spec.flattenNestedData == "true") :
+                    if isinstance(bronze_dataflow_spec.columnToExtract, list):
+                        column_to_extract = bronze_dataflow_spec.columnToExtract[0] if bronze_dataflow_spec.columnToExtract else ""
+                    else:
+                        column_to_extract = bronze_dataflow_spec.columnToExtract or ""
+                    raw_df = DataflowUtils.recurFlattenDF(raw_df, bronze_dataflow_spec.columnToExtract)
+                raw_df.filter("activityType = 3")
+                
         else:
-            return raw_df
+            raw_df = (
+                self.spark
+                .readStream
+                .format("kafka")
+                .options(**custom_removed_kafka_options)
+                .load()
+                .selectExpr("value as base64EncodedData", "offset as kafkaOffset", "partition as kafkaPartition", "timestamp as kafkaMessageTimestamp", "topic as kafkaTopic",  "headers")
+            )
+        if self.writer_config_options["includeIngestionTimeAsColumn"] == "true":
+            raw_df = raw_df.withColumn("databricksIngestionTimestamp", current_timestamp())
+
+        # if self.schema_json:
+        #     schema = StructType.fromJson(self.schema_json)
+        #     return (
+        #         raw_df.withColumn("parsed_records", from_json(col("value").cast("string"), schema))
+        #     )
+        return raw_df
 
     def get_eventhub_kafka_options(self):
         """Get eventhub options from dataflowspec."""
@@ -226,6 +317,8 @@ class PipelineReaders:
             "modificationTime as source_modification_time",
             "length as source_file_size"
         )
+        if self.writer_config_options["includeIngestionTimeAsColumn"] == "true":
+            input_df = input_df.withColumn("databricksIngestionTimestamp", current_timestamp())
         
         return input_df
 
