@@ -1,0 +1,8 @@
+{
+    "expect_or_drop": {
+        "valid_json": "is_error = false"
+    },
+    "expect_or_quarantine": {
+        "quarantine_rule": "is_error = true and error_details IS NOT NULL"
+    }
+}

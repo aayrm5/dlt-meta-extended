@@ -1,10 +1,10 @@
 [{
-  "data_flow_id": "1",
+  "data_flow_id": "4",
   "data_flow_group": "hkjc-streaming-dashboard-usecase",
   "source_format": "kafka",
   "source_details": {
     "kafka.bootstrap.servers": "kafka.confluent.edap.corpdev.hkjc.com:9092",
-    "subscribe": "edap-s-ap-fo-activity",
+    "subscribe": "edap-s-ap-pmu-activity",
     "kafka.security.protocol": "SSL",
     "kafka.ssl.truststore.location": "/Volumes/edap/default/certificates/truststore/kafka_truststore.jks",
     "kafka.ssl.keystore.location": "/Volumes/edap/default/certificates/keystore/kafka_keystore.jks",
@@ -32,7 +32,7 @@
     "target_details": {
       "catalog": "edap_dev",
       "schema": "stg_ak",
-      "table": "raw_sb_bet_transactions_fo",
+      "table": "raw_race_transactions_pmu",
       "path": "/Volumes/dlt_meta_uc/dlt_meta_gold_schema/gold_volume/data/gold/stores/"
     },
     "target_pii_fields": {
@@ -90,12 +90,12 @@
   }
 },
 {
-  "data_flow_id": "2",
+  "data_flow_id": "5",
   "data_flow_group": "hkjc-streaming-dashboard-usecase",
   "source_format": "kafka",
   "source_details": {
     "kafka.bootstrap.servers": "kafka.confluent.edap.corpdev.hkjc.com:9092",
-    "subscribe": "edap-s-ap-fo-activity",
+    "subscribe": "edap-s-ap-pmu-activity",
     "kafka.security.protocol": "SSL",
     "kafka.ssl.truststore.location": "/Volumes/edap/default/certificates/truststore/kafka_truststore.jks",
     "kafka.ssl.keystore.location": "/Volumes/edap/default/certificates/keystore/kafka_keystore.jks",
@@ -105,8 +105,7 @@
     "kafka.ssl.keystore.secrets.key": "capemm-keystore-pwd",
     "maxOffsetsPerTrigger": "10000",
     "kafka.session.timeout.ms": "30000",
-    "kafka.request.timeout.ms": "60000",
-    "source_schema_path": "file:/Workspace/Users/damanbansal@hkjccorpdev.onmicrosoft.com/aayrm5-dlt-meta/demo/resources/ddl/fo_data_schema.ddl"
+    "kafka.request.timeout.ms": "60000"
   },
   "bronze_reader_options": {
     "includeHeaders": "true",
@@ -119,14 +118,14 @@
     "kafka.fetch.min.bytes": "1024",
     "kafka.fetch.max.wait.ms": "5000",
     "kafka.max.partition.fetch.bytes": "1048576",
-    "custom_decode_fo": "true",
-    "custom_decode_trasaction_type": "BET_FO"
+    "custom_decode_pmu": "true",
+    "custom_decode_trasaction_type": "RACE_PMU"
   },
   "bronze": {
     "target_details": {
       "catalog": "edap_dev",
       "schema": "stg_ak",
-      "table": "ab_sb_bet_fo",
+      "table": "ab_race_pmu",
       "path": "/Volumes/dlt_meta_uc/dlt_meta_gold_schema/gold_volume/data/gold/stores/"
     },
     "target_pii_fields": {
@@ -149,15 +148,15 @@
       "mergeSchema": "true",
       "includeIngestionTimeAsColumn" : "true"
     },
-    "bronze_data_quality_expectations_json_dev": "file:/Workspace/Users/damanbansal@hkjccorpdev.onmicrosoft.com/aayrm5-dlt-meta/demo/conf/dqe/hkjc-kafka-bronze/decode_value_valid_json_fo.json",
+    "bronze_data_quality_expectations_json_dev": "file:/Workspace/Users/damanbansal@hkjccorpdev.onmicrosoft.com/aayrm5-dlt-meta/demo/conf/dqe/hkjc-kafka-bronze/decode_value_valid_json_pmu.json",
     "bronze_database_quarantine_dev": "edap_dev.stg_ak",
-    "bronze_quarantine_table": "ab_sb_bet_fo_reject",
+    "bronze_quarantine_table": "ab_race_pmu_reject",
     "bronze_quarantine_table_properties": {
       "delta.autoOptimize.optimizeWrite": "true",
       "delta.logRetentionDuration": "interval 90 days"
     }
   },
-  "flatten_nested_data": "true",
+  "flatten_nested_data": "false",
   "column_to_extract": "",
   "version": "2.0",
   "description": "Kafka-based real-time customer data pipeline with Unity Catalog support (catalog.schema.table structure), comprehensive PII encryption/decryption, data quality validation, and CDC support for customer event processing",
@@ -183,12 +182,12 @@
   }
 },
 {
-  "data_flow_id": "3",
+  "data_flow_id": "6",
   "data_flow_group": "hkjc-streaming-dashboard-usecase",
   "source_format": "kafka",
   "source_details": {
     "kafka.bootstrap.servers": "kafka.confluent.edap.corpdev.hkjc.com:9092",
-    "subscribe": "edap-s-ap-fo-activity",
+    "subscribe": "edap-s-ap-pmu-activity",
     "kafka.security.protocol": "SSL",
     "kafka.ssl.truststore.location": "/Volumes/edap/default/certificates/truststore/kafka_truststore.jks",
     "kafka.ssl.keystore.location": "/Volumes/edap/default/certificates/keystore/kafka_keystore.jks",
@@ -198,8 +197,7 @@
     "kafka.ssl.keystore.secrets.key": "capemm-keystore-pwd",
     "maxOffsetsPerTrigger": "10000",
     "kafka.session.timeout.ms": "30000",
-    "kafka.request.timeout.ms": "60000",
-    "source_schema_path": "file:/Workspace/Users/damanbansal@hkjccorpdev.onmicrosoft.com/aayrm5-dlt-meta/demo/resources/ddl/fo_data_schema.ddl"
+    "kafka.request.timeout.ms": "60000"
   },
   "bronze_reader_options": {
     "includeHeaders": "true",
@@ -212,14 +210,14 @@
     "kafka.fetch.min.bytes": "1024",
     "kafka.fetch.max.wait.ms": "5000",
     "kafka.max.partition.fetch.bytes": "1048576",
-    "custom_decode_fo": "true",
-    "custom_decode_trasaction_type": "BET_FO_CANCEL"
+    "custom_decode_pmu": "true",
+    "custom_decode_trasaction_type": "RACE_PMU_CANCEL"
   },
   "bronze": {
     "target_details": {
       "catalog": "edap_dev",
       "schema": "stg_ak",
-      "table": "ab_sb_cancel_fo",
+      "table": "ab_cancel_pmu",
       "path": "/Volumes/dlt_meta_uc/dlt_meta_gold_schema/gold_volume/data/gold/stores/"
     },
     "target_pii_fields": {
@@ -242,15 +240,15 @@
       "mergeSchema": "true",
       "includeIngestionTimeAsColumn" : "true"
     },
-    "bronze_data_quality_expectations_json_dev": "file:/Workspace/Users/damanbansal@hkjccorpdev.onmicrosoft.com/aayrm5-dlt-meta/demo/conf/dqe/hkjc-kafka-bronze/decode_value_valid_json_fo.json",
+    "bronze_data_quality_expectations_json_dev": "file:/Workspace/Users/damanbansal@hkjccorpdev.onmicrosoft.com/aayrm5-dlt-meta/demo/conf/dqe/hkjc-kafka-bronze/decode_value_valid_json_pmu.json",
     "bronze_database_quarantine_dev": "edap_dev.stg_ak",
-    "bronze_quarantine_table": "ab_sb_cancel_fo_reject",
+    "bronze_quarantine_table": "ab_cancel_pmu_reject",
     "bronze_quarantine_table_properties": {
       "delta.autoOptimize.optimizeWrite": "true",
       "delta.logRetentionDuration": "interval 90 days"
     }
   },
-  "flatten_nested_data": "true",
+  "flatten_nested_data": "false",
   "column_to_extract": "",
   "version": "2.0",
   "description": "Kafka-based real-time customer data pipeline with Unity Catalog support (catalog.schema.table structure), comprehensive PII encryption/decryption, data quality validation, and CDC support for customer event processing",

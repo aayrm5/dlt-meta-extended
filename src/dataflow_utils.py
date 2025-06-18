@@ -3,6 +3,8 @@ import logging
 from pyspark.sql import DataFrame
 from pyspark.sql.functions import explode, explode_outer, col
 from pyspark.sql.types import ArrayType, StructType
+import pyspark.sql.types as T
+import json
 
 logger = logging.getLogger('databricks.labs.dltmeta')
 
