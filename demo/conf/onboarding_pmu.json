@@ -26,7 +26,9 @@
     "kafka.request.timeout.ms": "60000",
     "kafka.fetch.min.bytes": "1024",
     "kafka.fetch.max.wait.ms": "5000",
-    "kafka.max.partition.fetch.bytes": "1048576"
+    "kafka.max.partition.fetch.bytes": "1048576",
+    "custom_decode_pmu": "true",
+    "custom_decode_trasaction_type": "RAW_PMU"
   },
   "bronze": {
     "target_details": {

@@ -196,15 +196,26 @@ class PipelineReaders:
         keys_to_remove = {"custom_decode_fo", "custom_decode_pmu","custom_decode_trasaction_type"}
         custom_removed_kafka_options = {k: v for k, v in kafka_options.items() if k not in keys_to_remove}
 
+        raw_df = (
+                self.spark
+                .readStream
+                .format("kafka")
+                .options(**custom_removed_kafka_options)
+                .load()
+        )
+
         if "custom_decode_fo" in kafka_options and kafka_options["custom_decode_fo"] == "true":
-            if kafka_options["custom_decode_trasaction_type"] == "BET_FO":
-                print("----------------In BET_FO FLOW OF THE PIPELINE READER-----------------------")
-                raw_df = (
-                    self.spark
-                    .readStream
-                    .format("kafka")
-                    .options(**custom_removed_kafka_options)
-                    .load()
+            print("----------------in custom decode FO-----------------------")
+
+            if kafka_options["custom_decode_trasaction_type"] == "RAW_FO":
+                print("----------------In RAW_FO-----------------------")
+                raw_df = (raw_df
+                .selectExpr("value as base64EncodedData", "offset as kafkaOffset", "partition as kafkaPartition", "timestamp as kafkaMessageTimestamp", "topic as kafkaTopic", "headers")
+                )
+
+            elif kafka_options["custom_decode_trasaction_type"] == "BET_FO":
+                print("----------------In BET_FO-----------------------")
+                raw_df = (raw_df
                     .withColumn("decoded_value",expr("decode(value, 'utf-8')"))
                     .withColumn("validJson", expr("validate_json_udf(decoded_value)"))
                     .withColumn("jsonValue", from_json(col("decoded_value"),kafka_source_schema ))
@@ -222,17 +233,12 @@ class PipelineReaders:
                         column_to_extract = bronze_dataflow_spec.columnToExtract[0] if bronze_dataflow_spec.columnToExtract else ""
                     else:
                         column_to_extract = bronze_dataflow_spec.columnToExtract or ""
-                    raw_df = DataflowUtils.recurFlattenDF(raw_df, bronze_dataflow_spec.columnToExtract)
-                raw_df = raw_df.filter("activityType = 1")
+                    raw_df = DataflowUtils.recurFlattenDF(raw_df, column_to_extract)
+                raw_df = raw_df.filter("headersRefined.ActivityCode = '1'")
                 
             elif kafka_options["custom_decode_trasaction_type"] == "BET_FO_CANCEL":
-                print("----------------In BET_FO_CANCEL FLOW OF THE PIPELINE READER-----------------------")
-                raw_df = (
-                    self.spark
-                    .readStream
-                    .format("kafka")
-                    .options(**custom_removed_kafka_options)
-                    .load()
+                print("----------------In BET_FO_CANCEL-----------------------")
+                raw_df = (raw_df
                     .withColumn("decoded_value",expr("decode(value, 'utf-8')"))
                     .withColumn("validJson", expr("validate_json_udf(decoded_value)"))
                     .withColumn("jsonValue", from_json(col("decoded_value"),kafka_source_schema ))
@@ -250,18 +256,21 @@ class PipelineReaders:
                         column_to_extract = bronze_dataflow_spec.columnToExtract[0] if bronze_dataflow_spec.columnToExtract else ""
                     else:
                         column_to_extract = bronze_dataflow_spec.columnToExtract or ""
-                    raw_df = DataflowUtils.recurFlattenDF(raw_df, bronze_dataflow_spec.columnToExtract)
-                raw_df = raw_df.filter("activityType = 3")
+                    raw_df = DataflowUtils.recurFlattenDF(raw_df, column_to_extract)
+                raw_df = raw_df.filter("headersRefined.ActivityCode = '3'")
 
-        if "custom_decode_pmu" in kafka_options and kafka_options["custom_decode_pmu"] == "true":
+        elif "custom_decode_pmu" in kafka_options and kafka_options["custom_decode_pmu"] == "true":
+            print("----------------in custom decode PMU-----------------------")
+            if kafka_options["custom_decode_trasaction_type"] == "RAW_PMU":
+                print("----------------In RAW_PMU-----------------------")
+                raw_df = (raw_df
+                          .withColumn("headers", expr("transform(headers, x -> struct(x.key, decode(x.value, 'UTF-8') as value))"))
+                          .selectExpr("value as binaryData", "offset as kafkaOffset", "partition as kafkaPartition", "timestamp as kafkaMessageTimestamp", "topic as kafkaTopic", "headers")
+                          )
+
             if kafka_options["custom_decode_trasaction_type"] == "RACE_PMU":
-                print("----------------In RACE_PMU FLOW OF THE PIPELINE READER-----------------------")
-                raw_df = (
-                    self.spark
-                    .readStream
-                    .format("kafka")
-                    .options(**custom_removed_kafka_options)
-                    .load()
+                print("----------------In RACE_PMU-----------------------")
+                raw_df = (raw_df
                     .withColumn("headers", expr("transform(headers, x -> struct(x.key, decode(x.value, 'UTF-8') as value))"))
                     .withColumn("headersRefined", expr("map_from_entries(headers)"))
                     .withColumn("kafkaOffset", expr("offset"))
@@ -274,13 +283,8 @@ class PipelineReaders:
                 raw_df = raw_df.filter("headersRefined.ActivityCode = '6'")
                 
             elif kafka_options["custom_decode_trasaction_type"] == "RACE_PMU_CANCEL":
-                print("----------------In RACE_PMU_CANCEL FLOW OF THE PIPELINE READER-----------------------")
-                raw_df = (
-                    self.spark
-                    .readStream
-                    .format("kafka")
-                    .options(**custom_removed_kafka_options)
-                    .load()
+                print("----------------In RACE_PMU_CANCEL-----------------------")
+                raw_df = (raw_df
                     .withColumn("headers", expr("transform(headers, x -> struct(x.key, decode(x.value, 'UTF-8') as value))"))
                     .withColumn("headersRefined", expr("map_from_entries(headers)"))
                     .withColumn("kafkaOffset", expr("offset"))
@@ -290,31 +294,12 @@ class PipelineReaders:
                 )
                 raw_df = raw_df.selectExpr("parse_message_cancel_udf(hex(value)) as root", "kafkaTopic", "kafkaPartition", "kafkaOffset", "KafkaTimeStamp")
                 raw_df = raw_df.selectExpr("kafkaOffset", "kafkaTopic", "kafkaPartition", "KafkaTimeStamp", "root.errors.*", "root.headerFields.*", "root.valueFields.*")
-                raw_df = raw_df.filter("headersRefined.ActivityCode = '6'")
-                
-        else:
-            print("----------------DID NOT ENTER ANY CUSTOM FLOW-----------------------")
-            raw_df = (
-                self.spark
-                .readStream
-                .format("kafka")
-                .options(**custom_removed_kafka_options)
-                .load()
-                .withColumn("decoded_value", expr("decode(value, 'utf-8')"))
-                .withColumn("validJson", expr("validate_json_udf(decoded_value)"))
-                .withColumn("is_error", col("validJson.is_error"))
-                .withColumn("error_details", col("validJson.error_details"))
-                .selectExpr("value as base64EncodedData", "offset as kafkaOffset", "partition as kafkaPartition", "timestamp as kafkaMessageTimestamp", "topic as kafkaTopic", "headers", "is_error", "error_details")
-            )
+                raw_df = raw_df.filter("headersRefined.ActivityCode = '8'")
+           
             
         if self.writer_config_options["includeIngestionTimeAsColumn"] == "true":
             raw_df = raw_df.withColumn("databricksIngestionTimestamp", current_timestamp())
 
-        # if self.schema_json:
-        #     schema = StructType.fromJson(self.schema_json)
-        #     return (
-        #         raw_df.withColumn("parsed_records", from_json(col("value").cast("string"), schema))
-        #     )
         return raw_df
 
     def get_eventhub_kafka_options(self):
@@ -377,38 +362,8 @@ class PipelineReaders:
                 raise Exception(f"Kafka ssl required params are: {params}! provided options are :{self.source_details}")
         else:
             kafka_options = {**kafka_base_ops, **self.reader_config_options}
-        print("Riyaz-------" + str(kafka_options))
+        # print("Riyaz-------" + str(kafka_options))
         return kafka_options
-
-    def read_ab_binary_messages(self) -> DataFrame:
-        """Read AB binary messages from source.
-        
-        Returns:
-            DataFrame: DataFrame containing AB binary messages
-        """
-        logger.info("In read_ab_binary_messages func")
-        
-        source_path = self.source_details["path"]
-    
-        # Read binary files
-        input_df = (
-            self.spark.readStream
-            .format("binaryFile")
-            .options(**self.reader_config_options)
-            .load(source_path)
-        )
-        
-        # Add metadata columns for AB messages
-        input_df = input_df.selectExpr(
-            "*",
-            "path as source_file_path",
-            "modificationTime as source_modification_time",
-            "length as source_file_size"
-        )
-        if self.writer_config_options["includeIngestionTimeAsColumn"] == "true":
-            input_df = input_df.withColumn("databricksIngestionTimestamp", current_timestamp())
-        
-        return input_df
 
 
 

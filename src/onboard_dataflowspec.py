@@ -66,8 +66,9 @@ class OnboardDataflowspec:
                 onboarding_df = self.__get_onboarding_file_dataframe(self.dict_obj['onboarding_file_path'])
                 sample_row = onboarding_df.first()
                 
-                # Check for bronze indicators
-                if any(col in onboarding_df.columns for col in ['bronze', 'source_details', 'bronze_reader_options']):
+                # Check for bronze indicators with environment substitution
+                env = self.dict_obj.get("env", "dev")
+                if any(col in onboarding_df.columns for col in [f'bronze_{env}', f'source_details_{env}', 'bronze_reader_options']):
                     layers.append('bronze')
                 
                 # Check for silver indicators  
@@ -228,7 +229,7 @@ class OnboardDataflowspec:
                 return False
                 
             if layer == 'bronze':
-                required_fields = ['data_flow_id', 'data_flow_group', 'source_details', 'bronze']
+                required_fields = ['data_flow_id', 'data_flow_group', f'source_details_{env}', f'bronze_{env}']
                 return all(field in sample_row and sample_row[field] is not None for field in required_fields)
                 
             elif layer == 'silver':
@@ -688,7 +689,16 @@ class OnboardDataflowspec:
                     reference_name = source["reference_name"]
                     #source_path_{env} = source[f"source_path_{env}"]
                     # source_catalog= source["source_catalog"] if "source_catalog" in source else ""
-                    source_table = source["source_table"]
+                    # Updated to support environment-specific source_table
+
+                    if f"source_table_{env}" in source:
+                        source_table = source[f"source_table_{env}"]
+                    else:
+                        # Fallback to legacy source_table field for backward compatibility
+                        source_table = source.get("source_table", "")
+                        if not source_table:
+                            logger.warning(f"No source_table or source_table_{env} found in source: {source}")
+                            
                     source_is_streaming = source["is_streaming"] if "is_streaming" in source else "false"
                     sourceRow = (
                         filter_condition,
@@ -882,8 +892,8 @@ class OnboardDataflowspec:
         mandatory_fields = [
             "data_flow_id",
             "data_flow_group",
-            "source_details",
-            "bronze",
+            f"source_details_{env}",  # Updated to use environment variable
+            f"bronze_{env}",          # Updated to use environment variable
             "bronze_reader_options",
         ]
         for onboarding_row in onboarding_rows:
@@ -918,89 +928,89 @@ class OnboardDataflowspec:
             )
             bronze_target_format = "delta"
             bronze_target_details = {
-                "database": onboarding_row["bronze"]["target_details"]["catalog"]+"."+onboarding_row["bronze"]["target_details"]["schema"],
-                "table": onboarding_row["bronze"]["target_details"]["table"],
+                "database": onboarding_row[f"bronze_{env}"]["target_details"]["catalog"]+"."+onboarding_row[f"bronze_{env}"]["target_details"]["schema"],
+                "table": onboarding_row[f"bronze_{env}"]["target_details"]["table"],
             }
             if not self.uc_enabled:
-                if "path" in onboarding_row["bronze"]["target_details"]:
-                    bronze_target_details["path"] = onboarding_row["bronze"]["target_details"]["path"]
+                if "path" in onboarding_row[f"bronze_{env}"]["target_details"]:
+                    bronze_target_details["path"] = onboarding_row[f"bronze_{env}"]["target_details"]["path"]
                 else:
                     raise Exception(f"bronze_table_path_{env} not provided in onboarding_row={onboarding_row}")
             bronze_table_properties = {}
             if (
-                "bronze_table_properties" in onboarding_row["bronze"]
-                and onboarding_row["bronze"]["bronze_table_properties"]
+                "bronze_table_properties" in onboarding_row[f"bronze_{env}"]
+                and onboarding_row[f"bronze_{env}"]["bronze_table_properties"]
             ):
                 bronze_table_properties = self.__delete_none(
-                    onboarding_row["bronze"]["bronze_table_properties"].asDict()
+                    onboarding_row[f"bronze_{env}"]["bronze_table_properties"].asDict()
                 )
 
             partition_columns = [""]
             if (
-                "bronze_partition_columns" in onboarding_row["bronze"]
-                and onboarding_row["bronze"]["bronze_partition_columns"]
+                "partition_columns" in onboarding_row[f"bronze_{env}"]
+                and onboarding_row[f"bronze_{env}"]["partition_columns"]
             ):
                 # Split if this is a list separated by commas
-                if "," in onboarding_row["bronze"]["bronze_partition_columns"]:
-                    partition_columns = onboarding_row["bronze"]["bronze_partition_columns"].split(",")
+                if "," in onboarding_row[f"bronze_{env}"]["partition_columns"]:
+                    partition_columns = onboarding_row[f"bronze_{env}"]["partition_columns"].split(",")
                 else:
-                    partition_columns = [onboarding_row["bronze"]["bronze_partition_columns"]]
+                    partition_columns = [onboarding_row[f"bronze_{env}"]["partition_columns"]]
 
-            cluster_by = self.__get_cluster_by_properties(onboarding_row, "bronze", bronze_table_properties, "cluster_by")
+            cluster_by = self.__get_cluster_by_properties(onboarding_row, f"bronze_{env}", bronze_table_properties, "cluster_by")
 
             cdc_apply_changes = None
             if (
-                "cdc_apply_changes" in onboarding_row["bronze"]
-                and onboarding_row["bronze"]["cdc_apply_changes"]
+                "cdc_apply_changes" in onboarding_row[f"bronze_{env}"]
+                and onboarding_row[f"bronze_{env}"]["cdc_apply_changes"]
             ):
-                self.__validate_apply_changes(onboarding_row, "bronze")
+                self.__validate_apply_changes(onboarding_row, f"bronze_{env}")
                 cdc_apply_changes = json.dumps(
                     self.__delete_none(
-                        onboarding_row["bronze"]["cdc_apply_changes"].asDict()
+                        onboarding_row[f"bronze_{env}"]["cdc_apply_changes"].asDict()
                     )
                 )
             apply_changes_from_snapshot = None
-            if ("apply_changes_from_snapshot" in onboarding_row["bronze"]
-                    and onboarding_row["bronze"]["apply_changes_from_snapshot"]):
-                self.__validate_apply_changes_from_snapshot(onboarding_row, "bronze")
+            if ("apply_changes_from_snapshot" in onboarding_row[f"bronze_{env}"]
+                    and onboarding_row[f"bronze_{env}"]["apply_changes_from_snapshot"]):
+                self.__validate_apply_changes_from_snapshot(onboarding_row, f"bronze_{env}")
                 apply_changes_from_snapshot = json.dumps(
-                    self.__delete_none(onboarding_row["bronze"]["apply_changes_from_snapshot"].asDict())
+                    self.__delete_none(onboarding_row[f"bronze_{env}"]["apply_changes_from_snapshot"].asDict())
                 )
             data_quality_expectations = None
             quarantine_target_details = {}
             quarantine_table_properties = {}
-            if f"bronze_data_quality_expectations_json_{env}" in onboarding_row["bronze"]:
-                bronze_data_quality_expectations_json = onboarding_row["bronze"][f"bronze_data_quality_expectations_json_{env}"]
+            if f"bronze_data_quality_expectations_json_{env}" in onboarding_row[f"bronze_{env}"]:
+                bronze_data_quality_expectations_json = onboarding_row[f"bronze_{env}"][f"bronze_data_quality_expectations_json_{env}"]
                 if bronze_data_quality_expectations_json:
                     data_quality_expectations = self.__get_data_quality_expecations(
                         bronze_data_quality_expectations_json
                     )
-            if ("bronze_quarantine_table" in onboarding_row["bronze"] and onboarding_row["bronze"]["bronze_quarantine_table"]):
-                quarantine_target_details, quarantine_table_properties = self.__get_quarantine_details(env, onboarding_row, "bronze")
+            if ("bronze_quarantine_table" in onboarding_row[f"bronze_{env}"] and onboarding_row[f"bronze_{env}"]["bronze_quarantine_table"]):
+                quarantine_target_details, quarantine_table_properties = self.__get_quarantine_details(env, onboarding_row, f"bronze_{env}")
             
             writer_config_options = {}
             if (
-                "bronze_writer_config_options" in onboarding_row["bronze"] and onboarding_row["bronze"]["bronze_writer_config_options"]
+                "bronze_writer_config_options" in onboarding_row[f"bronze_{env}"] and onboarding_row[f"bronze_{env}"]["bronze_writer_config_options"]
             ):
                 writer_config_options = self.__delete_none(
-                    onboarding_row["bronze"]["bronze_writer_config_options"].asDict())
+                    onboarding_row[f"bronze_{env}"]["bronze_writer_config_options"].asDict())
             
             targetPiiFields = {}
             if (
-                "targetPiiFields" in onboarding_row["bronze"]
-                and onboarding_row["bronze"]["targetPiiFields"]
+                "target_pii_fields" in onboarding_row[f"bronze_{env}"]
+                and onboarding_row[f"bronze_{env}"]["target_pii_fields"]
             ):
-                print(onboarding_row["bronze"]["targetPiiFields"])
+                print(onboarding_row[f"bronze_{env}"]["target_pii_fields"])
                 targetPiiFields = self.__delete_none(
-                    onboarding_row["bronze"]["targetPiiFields"].asDict()
+                    onboarding_row[f"bronze_{env}"]["target_pii_fields"].asDict()
                     )
 
             append_flows, append_flows_schemas = self.get_append_flows_json(
-                onboarding_row, "bronze", env
+                onboarding_row, f"bronze_{env}", env
             )
             
-            if "is_streaming" in onboarding_row["bronze"] and onboarding_row["bronze"]["is_streaming"]:
-                isStreaming = onboarding_row["bronze"]["is_streaming"]
+            if "is_streaming" in onboarding_row[f"bronze_{env}"] and onboarding_row[f"bronze_{env}"]["is_streaming"]:
+                isStreaming = onboarding_row[f"bronze_{env}"]["is_streaming"]
             else:
                 isStreaming = None
             
@@ -1261,7 +1271,7 @@ class OnboardDataflowspec:
             bronze_reader_config_options = self.__delete_none(
                 bronze_reader_options_json.asDict()
             )
-        source_details_json = onboarding_row["source_details"]
+        source_details_json = onboarding_row[f"source_details_{env}"]  # Updated to use environment variable
         if source_details_json:
             source_details_file = self.__delete_none(source_details_json.asDict())
             if (source_format.lower() == "cloudfiles"
@@ -1731,4 +1741,3 @@ class OnboardDataflowspec:
             data, data_flow_spec_schema
         ).toDF(*data_flow_spec_columns)
         return data_flow_spec_rows_df
-
