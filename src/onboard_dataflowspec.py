@@ -1,4 +1,4 @@
-"""OnboardDataflowSpec class provides bronze/silver onboarding features."""
+"""OnboardDataflowSpec class provides bronze/silver/gold onboarding features with flexible layer selection."""
 
 import copy
 import dataclasses
@@ -9,7 +9,7 @@ import pyspark.sql.types as T
 from pyspark.sql import functions as f
 from pyspark.sql.types import ArrayType, MapType, StringType, StructField, StructType
 
-from src.dataflow_spec import BronzeDataflowSpec, DataflowSpecUtils, SilverDataflowSpec
+from src.dataflow_spec import BronzeDataflowSpec, DataflowSpecUtils, SilverDataflowSpec, GoldDataflowSpec
 from src.metastore_ops import DeltaPipelinesInternalTableOps, DeltaPipelinesMetaStoreOps
 
 logger = logging.getLogger("databricks.labs.dltmeta")
@@ -17,7 +17,7 @@ logger.setLevel(logging.INFO)
 
 
 class OnboardDataflowspec:
-    """OnboardDataflowSpec class provides bronze/silver onboarding features."""
+    """OnboardDataflowSpec class provides bronze/silver/gold onboarding features with flexible layer selection."""
 
     def __init__(self, spark, dict_obj, bronze_schema_mapper=None, uc_enabled=False):
         """Onboard Dataflowspec Constructor."""
@@ -25,29 +25,98 @@ class OnboardDataflowspec:
         self.dict_obj = dict_obj
         self.bronze_dict_obj = copy.deepcopy(dict_obj)
         self.silver_dict_obj = copy.deepcopy(dict_obj)
+        self.gold_dict_obj = copy.deepcopy(dict_obj)
         self.uc_enabled = uc_enabled
+        
+        # Determine which layers to onboard based on available specifications
+        self.layers_to_onboard = self._determine_layers_to_onboard()
+        logger.info(f"Layers to onboard: {self.layers_to_onboard}")
+        
         self.__initialize_paths(uc_enabled)
         self.bronze_schema_mapper = bronze_schema_mapper
         self.deltaPipelinesMetaStoreOps = DeltaPipelinesMetaStoreOps(self.spark)
         self.deltaPipelinesInternalTableOps = DeltaPipelinesInternalTableOps(self.spark)
         self.onboard_file_type = None
 
-    def __initialize_paths(self, uc_enabled):
-        if "silver_dataflowspec_table" in self.bronze_dict_obj:
-            del self.bronze_dict_obj["silver_dataflowspec_table"]
-        if "silver_dataflowspec_path" in self.bronze_dict_obj:
-            del self.bronze_dict_obj["silver_dataflowspec_path"]
+    def _determine_layers_to_onboard(self):
+        """
+        Determine which layers (bronze, silver, gold) should be onboarded based on available specifications.
+        
+        Returns:
+            list: List of layers to onboard ('bronze', 'silver', 'gold')
+        """
+        layers = []
+        
+        # Check for bronze layer
+        if any(key in self.dict_obj for key in ['bronze_dataflowspec_table', 'bronze_dataflowspec_path']):
+            layers.append('bronze')
+        
+        # Check for silver layer
+        if any(key in self.dict_obj for key in ['silver_dataflowspec_table', 'silver_dataflowspec_path']):
+            layers.append('silver')
+            
+        # Check for gold layer
+        if any(key in self.dict_obj for key in ['gold_dataflowspec_table', 'gold_dataflowspec_path']):
+            layers.append('gold')
+        
+        # If no specific layers detected, check for any data in onboarding file
+        if not layers and 'onboarding_file_path' in self.dict_obj:
+            try:
+                # Try to read the onboarding file to determine available layers
+                onboarding_df = self.__get_onboarding_file_dataframe(self.dict_obj['onboarding_file_path'])
+                sample_row = onboarding_df.first()
+                
+                # Check for bronze indicators
+                if any(col in onboarding_df.columns for col in ['bronze', 'source_details', 'bronze_reader_options']):
+                    layers.append('bronze')
+                
+                # Check for silver indicators  
+                if sample_row and any('silver' in col.lower() for col in onboarding_df.columns):
+                    layers.append('silver')
+                    
+                # Check for gold indicators
+                if sample_row and any('gold' in col.lower() for col in onboarding_df.columns):
+                    layers.append('gold')
+            except Exception as e:
+                logger.warning(f"Could not auto-determine layers from onboarding file: {e}")
+                # Default to bronze if nothing else is specified
+                layers = ['bronze']
+        
+        return layers if layers else ['bronze']  # Default to bronze if nothing detected
 
-        if "bronze_dataflowspec_table" in self.silver_dict_obj:
-            del self.silver_dict_obj["bronze_dataflowspec_table"]
-        if "bronze_dataflowspec_path" in self.silver_dict_obj:
-            del self.silver_dict_obj["bronze_dataflowspec_path"]
+    def __initialize_paths(self, uc_enabled):
+        """Initialize paths by removing irrelevant path configurations based on layers to onboard."""
+        
+        # For bronze dict, remove silver and gold specifications
+        if 'bronze' in self.layers_to_onboard:
+            for key in ['silver_dataflowspec_table', 'silver_dataflowspec_path', 
+                       'gold_dataflowspec_table', 'gold_dataflowspec_path']:
+                if key in self.bronze_dict_obj:
+                    del self.bronze_dict_obj[key]
+        
+        # For silver dict, remove bronze and gold specifications  
+        if 'silver' in self.layers_to_onboard:
+            for key in ['bronze_dataflowspec_table', 'bronze_dataflowspec_path',
+                       'gold_dataflowspec_table', 'gold_dataflowspec_path']:
+                if key in self.silver_dict_obj:
+                    del self.silver_dict_obj[key]
+        
+        # For gold dict, remove bronze and silver specifications
+        if 'gold' in self.layers_to_onboard:
+            for key in ['bronze_dataflowspec_table', 'bronze_dataflowspec_path',
+                       'silver_dataflowspec_table', 'silver_dataflowspec_path']:
+                if key in self.gold_dict_obj:
+                    del self.gold_dict_obj[key]
+
+        # Handle UC-specific path removal
         if uc_enabled:
             print("uc_enabled:", uc_enabled)
-            if "bronze_dataflowspec_path" in self.bronze_dict_obj:
+            if 'bronze' in self.layers_to_onboard and "bronze_dataflowspec_path" in self.bronze_dict_obj:
                 del self.bronze_dict_obj["bronze_dataflowspec_path"]
-            if "silver_dataflowspec_path" in self.silver_dict_obj:
+            if 'silver' in self.layers_to_onboard and "silver_dataflowspec_path" in self.silver_dict_obj:
                 del self.silver_dict_obj["silver_dataflowspec_path"]
+            if 'gold' in self.layers_to_onboard and "gold_dataflowspec_path" in self.gold_dict_obj:
+                del self.gold_dict_obj["gold_dataflowspec_path"]
 
     @staticmethod
     def __validate_dict_attributes(attributes, dict_obj):
@@ -73,52 +142,108 @@ class OnboardDataflowspec:
                 f"missing attributes : {set(attributes).difference(attributes_keys)}"
             )
 
+    def _validate_layer_specific_attributes(self, layer):
+        """
+        Validate attributes specific to a layer.
+        
+        Args:
+            layer (str): Layer name ('bronze', 'silver', 'gold')
+        """
+        base_attributes = [
+            "database",
+            "onboarding_file_path", 
+            "overwrite",
+            "env",
+            "version",
+            "import_author" 
+        ]
+        
+        # Add layer-specific attributes
+        if layer == 'bronze':
+            base_attributes.append("bronze_dataflowspec_table")
+            if not self.uc_enabled:
+                base_attributes.append("bronze_dataflowspec_path")
+        elif layer == 'silver':
+            base_attributes.append("silver_dataflowspec_table") 
+            if not self.uc_enabled:
+                base_attributes.append("silver_dataflowspec_path")
+        elif layer == 'gold':
+            base_attributes.append("gold_dataflowspec_table")
+            if not self.uc_enabled:
+                base_attributes.append("gold_dataflowspec_path")
+        
+        # Validate against the appropriate dict object
+        if layer == 'bronze':
+            self.__validate_dict_attributes(base_attributes, self.bronze_dict_obj)
+        elif layer == 'silver':
+            self.__validate_dict_attributes(base_attributes, self.silver_dict_obj)  
+        elif layer == 'gold':
+            self.__validate_dict_attributes(base_attributes, self.gold_dict_obj)
+
     def onboard_dataflow_specs(self):
         """
-        Onboard_dataflow_specs method will onboard dataFlowSpecs for bronze, silver and gold.
+        Onboard_dataflow_specs method will onboard dataFlowSpecs for the determined layers.
 
-        This method takes in a SparkSession object and a dictionary object containing the following attributes:
-        - onboarding_file_path: The path to the onboarding file.
-        - database: The name of the database to onboard the dataflow specs to.
-        - env: The environment to onboard the dataflow specs to.
-        - bronze_dataflowspec_table: The name of the bronze dataflow specs table.
-        - bronze_dataflowspec_path: The path to the bronze dataflow specs.
-        - silver_dataflowspec_table: The name of the silver dataflow specs table.
-        - silver_dataflowspec_path: The path to the silver dataflow specs.
-        - import_author: The author of the import.
-        - version: The version of the import.
-        - overwrite: Whether to overwrite existing dataflow specs or not.
-
-        If the `uc_enabled` flag is set to True, the dictionary object must contain all the attributes listed above.
-        If the `uc_enabled` flag is set to False, the dictionary object must contain all the attributes listed above
-        except for `bronze_dataflowspec_path` and `silver_dataflowspec_path`.
-
-        This method calls the `onboard_bronze_dataflow_spec` and `onboard_silver_dataflow_spec` methods to onboard
-        the bronze and silver dataflow specs respectively.
+        This method dynamically onboards only the layers that have been specified in the configuration.
+        It validates each layer's requirements independently and only processes the relevant layers.
         """
+        
+        # Validate attributes for each layer that will be onboarded
+        for layer in self.layers_to_onboard:
+            try:
+                self._validate_layer_specific_attributes(layer)
+                logger.info(f"Validation successful for {layer} layer")
+            except ValueError as e:
+                logger.error(f"Validation failed for {layer} layer: {e}")
+                raise
 
-        attributes = [
-            "onboarding_file_path",
-            "database",
-            "env",
-            "bronze_dataflowspec_table",
-            "silver_dataflowspec_table",
-            "import_author",
-            "version",
-            "overwrite",
-        ]
-        if self.uc_enabled:
-            if "bronze_dataflowspec_path" in self.dict_obj:
-                del self.dict_obj["bronze_dataflowspec_path"]
-            if "silver_dataflowspec_path" in self.dict_obj:
-                del self.dict_obj["silver_dataflowspec_path"]
-            self.__validate_dict_attributes(attributes, self.dict_obj)
-        else:
-            attributes.append("bronze_dataflowspec_path")
-            attributes.append("silver_dataflowspec_path")
-            self.__validate_dict_attributes(attributes, self.dict_obj)
-        self.onboard_bronze_dataflow_spec()
-        self.onboard_silver_dataflow_spec()
+        # Onboard each layer based on the determined layers
+        if 'bronze' in self.layers_to_onboard:
+            logger.info("Starting bronze dataflow spec onboarding...")
+            self.onboard_bronze_dataflow_spec()
+            
+        if 'silver' in self.layers_to_onboard:
+            logger.info("Starting silver dataflow spec onboarding...")
+            self.onboard_silver_dataflow_spec()
+            
+        if 'gold' in self.layers_to_onboard:
+            logger.info("Starting gold dataflow spec onboarding...")
+            self.onboard_gold_dataflow_spec()
+
+    def _validate_onboarding_data_for_layer(self, onboarding_df, layer, env):
+        """
+        Validate that the onboarding dataframe contains required data for the specified layer.
+        
+        Args:
+            onboarding_df: The onboarding dataframe
+            layer (str): Layer name ('bronze', 'silver', 'gold')
+            env (str): Environment name
+            
+        Returns:
+            bool: True if data is available for the layer
+        """
+        try:
+            sample_row = onboarding_df.first()
+            if not sample_row:
+                return False
+                
+            if layer == 'bronze':
+                required_fields = ['data_flow_id', 'data_flow_group', 'source_details', 'bronze']
+                return all(field in sample_row and sample_row[field] is not None for field in required_fields)
+                
+            elif layer == 'silver':
+                required_fields = ['data_flow_id', 'data_flow_group', f'silver_database_{env}', 'silver_table']
+                return all(field in sample_row and sample_row[field] is not None for field in required_fields)
+                
+            elif layer == 'gold':
+                required_fields = ['data_flow_id', 'data_flow_group', f'gold_database_{env}', 'gold_table']
+                return all(field in sample_row and sample_row[field] is not None for field in required_fields)
+                
+        except Exception as e:
+            logger.warning(f"Could not validate onboarding data for {layer}: {e}")
+            return False
+        
+        return False
 
     def register_bronze_dataflow_spec_tables(self):
         """Register bronze/silver dataflow specs tables."""
@@ -138,7 +263,7 @@ class OnboardDataflowspec:
         ).show()
 
     def register_silver_dataflow_spec_tables(self):
-        """Register bronze dataflow specs tables."""
+        """Register silver dataflow specs tables."""
         self.deltaPipelinesMetaStoreOps.create_database(
             self.dict_obj["database"], "dlt-meta database"
         )
@@ -154,23 +279,119 @@ class OnboardDataflowspec:
             f"""{self.dict_obj["database"]}.{self.dict_obj["silver_dataflowspec_table"]}"""
         ).show()
 
+    def register_gold_dataflow_spec_tables(self):
+        """Register gold dataflow specs tables."""
+        self.deltaPipelinesMetaStoreOps.create_database(
+            self.dict_obj["database"], "dlt-meta database"
+        )
+        self.deltaPipelinesMetaStoreOps.register_table_in_metastore(
+            self.dict_obj["database"],
+            self.dict_obj["gold_dataflowspec_table"],
+            self.dict_obj["gold_dataflowspec_path"],
+        )
+        logger.info(
+            f"""onboarded gold table={self.dict_obj["database"]}.{self.dict_obj["gold_dataflowspec_table"]}"""
+        )
+        self.spark.read.table(
+            f"""{self.dict_obj["database"]}.{self.dict_obj["gold_dataflowspec_table"]}"""
+        ).show()
+
+    def onboard_bronze_dataflow_spec(self):
+        """
+        Onboard bronze dataflow spec.
+        Modified to only process if bronze layer is in the layers to onboard.
+        """
+        if 'bronze' not in self.layers_to_onboard:
+            logger.info("Bronze layer not selected for onboarding, skipping...")
+            return
+            
+        attributes = [
+            "onboarding_file_path",
+            "database",
+            "env",
+            "bronze_dataflowspec_table",
+            "import_author",
+            "version",
+            "overwrite",
+        ]
+        dict_obj = self.bronze_dict_obj
+        if self.uc_enabled:
+            self.__validate_dict_attributes(attributes, dict_obj)
+        else:
+            attributes.append("bronze_dataflowspec_path")
+            self.__validate_dict_attributes(attributes, dict_obj)
+
+        onboarding_df = self.__get_onboarding_file_dataframe(
+            dict_obj["onboarding_file_path"]
+        )
+
+        # Validate that the onboarding data contains bronze information
+        if not self._validate_onboarding_data_for_layer(onboarding_df, 'bronze', dict_obj["env"]):
+            raise Exception("Onboarding file does not contain valid bronze layer data")
+
+        bronze_dataflow_spec_df = self.__get_bronze_dataflow_spec_dataframe(
+            onboarding_df, dict_obj["env"]
+        )
+
+        bronze_dataflow_spec_df = self.__add_audit_columns(
+            bronze_dataflow_spec_df,
+            {
+                "import_author": dict_obj["import_author"],
+                "version": dict_obj["version"],
+            },
+        )
+        bronze_fields = [field.name for field in dataclasses.fields(BronzeDataflowSpec)]
+        bronze_dataflow_spec_df = bronze_dataflow_spec_df.select(bronze_fields)
+        database = dict_obj["database"]
+        table = dict_obj["bronze_dataflowspec_table"]
+
+        if dict_obj["overwrite"] == "True":
+            if self.uc_enabled:
+                (
+                    bronze_dataflow_spec_df.write.format("delta")
+                    .mode("overwrite")
+                    .option("mergeSchema", "true")
+                    .saveAsTable(f"{database}.{table}")
+                )
+            else:
+                (
+                    bronze_dataflow_spec_df.write.mode("overwrite")
+                    .format("delta")
+                    .option("mergeSchema", "true")
+                    .save(path=dict_obj["bronze_dataflowspec_path"])
+                )
+        else:
+            if self.uc_enabled:
+                original_dataflow_df = self.spark.read.format("delta").table(
+                    f"{database}.{table}"
+                )
+            else:
+                self.deltaPipelinesMetaStoreOps.register_table_in_metastore(
+                    database, table, dict_obj["bronze_dataflowspec_path"]
+                )
+                original_dataflow_df = self.spark.read.format("delta").load(
+                    dict_obj["bronze_dataflowspec_path"]
+                )
+
+            logger.info("In Merge block for Bronze")
+            self.deltaPipelinesInternalTableOps.merge(
+                bronze_dataflow_spec_df,
+                f"{database}.{table}",
+                ["dataFlowId"],
+                original_dataflow_df.columns,
+            )
+        if not self.uc_enabled:
+            self.register_bronze_dataflow_spec_tables()
+
     def onboard_silver_dataflow_spec(self):
         """
         Onboard silver dataflow spec.
-
-        Args:
-            onboarding_df (pyspark.sql.DataFrame): DataFrame containing the onboarding file data.
-            dict_obj (dict): Dictionary containing the required attributes for onboarding silver dataflow spec.
-                Required attributes:
-                    - onboarding_file_path (str): Path of the onboarding file.
-                    - database (str): Name of the database.
-                    - env (str): Environment name.
-                    - silver_dataflowspec_table (str): Name of the silver dataflow spec table.
-                    - silver_dataflowspec_path (str): Path of the silver dataflow spec file. if uc_enabled is False
-                    - import_author (str): Name of the import author.
-                    - version (str): Version of the dataflow spec.
-                    - overwrite (str): Whether to overwrite the existing dataflow spec table/file or not.
+        Modified to only process if silver layer is in the layers to onboard.
         """
+        if 'silver' not in self.layers_to_onboard:
+            logger.info("Silver layer not selected for onboarding, skipping...")
+            return
+            
         attributes = [
             "onboarding_file_path",
             "database",
@@ -190,6 +411,11 @@ class OnboardDataflowspec:
         onboarding_df = self.__get_onboarding_file_dataframe(
             dict_obj["onboarding_file_path"]
         )
+        
+        # Validate that the onboarding data contains silver information
+        if not self._validate_onboarding_data_for_layer(onboarding_df, 'silver', dict_obj["env"]):
+            raise Exception("Onboarding file does not contain valid silver layer data")
+            
         silver_data_flow_spec_df = self.__get_silver_dataflow_spec_dataframe(
             onboarding_df, dict_obj["env"]
         )
@@ -282,81 +508,117 @@ class OnboardDataflowspec:
         if not self.uc_enabled:
             self.register_silver_dataflow_spec_tables()
 
-    def onboard_bronze_dataflow_spec(self):
+
+    def onboard_gold_dataflow_spec(self):
         """
-        Onboard bronze dataflow spec.
-
-        This function reads the onboarding file and creates bronze dataflow spec. It adds audit columns to the dataframe
-        If overwrite is True, it overwrites the table or file with the new dataframe. If overwrite is False,
-        it merges the new dataframe with the existing dataframe.
-        dict_obj (dict): Dictionary containing the required attributes for onboarding bronze dataflow spec.
-            Required attributes:
-                - onboarding_file_path (str): Path of the onboarding file.
-                - database (str): Name of the database.
-                - env (str): Environment name.
-                - bronze_dataflowspec_table (str): Name of the bronze dataflow spec table.
-                - bronze_dataflowspec_path (str): Path of the bronze dataflow spec file. if uc_enabled is False
-                - import_author (str): Name of the import author.
-                - version (str): Version of the dataflow spec.
-                - overwrite (str): Whether to overwrite the existing dataflow spec table/file or not.
-
-        Args:
-            None
-
-        Returns:
-            None
+        Onboard gold dataflow spec.
+        Modified to only process if gold layer is in the layers to onboard.
         """
+        if 'gold' not in self.layers_to_onboard:
+            logger.info("Gold layer not selected for onboarding, skipping...")
+            return
+            
         attributes = [
             "onboarding_file_path",
             "database",
             "env",
-            "bronze_dataflowspec_table",
+            "gold_dataflowspec_table",
             "import_author",
             "version",
             "overwrite",
         ]
-        dict_obj = self.bronze_dict_obj
+        dict_obj = self.gold_dict_obj
         if self.uc_enabled:
             self.__validate_dict_attributes(attributes, dict_obj)
         else:
-            attributes.append("bronze_dataflowspec_path")
+            attributes.append("gold_dataflowspec_path")
             self.__validate_dict_attributes(attributes, dict_obj)
 
         onboarding_df = self.__get_onboarding_file_dataframe(
             dict_obj["onboarding_file_path"]
         )
-
-        bronze_dataflow_spec_df = self.__get_bronze_dataflow_spec_dataframe(
+        
+        # Validate that the onboarding data contains gold information
+        if not self._validate_onboarding_data_for_layer(onboarding_df, 'gold', dict_obj["env"]):
+            raise Exception("Onboarding file does not contain valid gold layer data")
+            
+        gold_data_flow_spec_df = self.__get_gold_dataflow_spec_dataframe(
             onboarding_df, dict_obj["env"]
         )
+        columns = StructType([
+            StructField("dlt_views",ArrayType(
+                StructType([StructField("reference_name",StringType(),True),
+                            StructField("sql_condition",StringType(),True)]))),
+                            StructField("sources",ArrayType(
+                                                        StructType([
+                                                            StructField("filter_condition",StringType(),True)
+                                                            ,StructField("pii_fields",MapType(StringType(),StringType(),True),True)
+                                                            ,StructField("reference_name",StringType(),True)
+                                                            # ,StructField("source_catalog",StringType(),True)
+                                                            ,StructField("source_table",StringType(),True)
+                                                            ,StructField("is_streaming",StringType(),True)
+                                                            ])
+                                                            )
+                                        ),
+            StructField("target_table",StringType(),True),
+        ])
 
-        bronze_dataflow_spec_df = self.__add_audit_columns(
-            bronze_dataflow_spec_df,
+        emp_rdd = []
+        env = dict_obj["env"]
+        gold_transformation_json_df = self.spark.createDataFrame(
+            data=emp_rdd, schema=columns
+        )
+        gold_transformation_json_file = onboarding_df.select(
+            f"gold_transformation_json_{env}"
+        ).dropDuplicates()
+
+        gold_transformation_json_files = gold_transformation_json_file.collect()
+        for row in gold_transformation_json_files:
+            gold_transformation_json_df = gold_transformation_json_df.union(
+                # self.spark.read.option("multiline", "true").schema(columns).json(row[f"gold_transformation_json_{env}"])
+                self.__update_goldtransform_schema(row[f"gold_transformation_json_{env}"], columns)
+            )
+
+        logger.info(gold_transformation_json_file)
+
+        gold_data_flow_spec_df = gold_transformation_json_df.join(
+            gold_data_flow_spec_df,
+            gold_transformation_json_df.target_table
+            == gold_data_flow_spec_df.targetDetails["table"],
+        )
+        gold_dataflow_spec_df = (
+            gold_data_flow_spec_df.drop("target_table")  # .drop("path")
+            .drop("target_partition_cols")
+        )
+
+        # if(f"source_catalog_{env}" in gold_dataflow_spec_df.select("sources").withColumn("sources",expr("explode(sources)")).select("sources.*").columns) :
+        #     gold_dataflow_spec_df = gold_dataflow_spec_df.withColumn('sources', transform( "sources" , lambda source : source.withField('source_catalog', source[f"source_catalog_{env}"])))
+
+        gold_dataflow_spec_df = self.__add_audit_columns(
+            gold_dataflow_spec_df,
             {
                 "import_author": dict_obj["import_author"],
                 "version": dict_obj["version"],
             },
         )
-        bronze_fields = [field.name for field in dataclasses.fields(BronzeDataflowSpec)]
-        bronze_dataflow_spec_df = bronze_dataflow_spec_df.select(bronze_fields)
+
+        gold_fields = [field.name for field in dataclasses.fields(GoldDataflowSpec)]
+        gold_dataflow_spec_df = gold_dataflow_spec_df.select(gold_fields)
         database = dict_obj["database"]
-        table = dict_obj["bronze_dataflowspec_table"]
+        table = dict_obj["gold_dataflowspec_table"]
 
         if dict_obj["overwrite"] == "True":
             if self.uc_enabled:
                 (
-                    bronze_dataflow_spec_df.write.format("delta")
+                    gold_dataflow_spec_df.write.format("delta")
                     .mode("overwrite")
                     .option("mergeSchema", "true")
                     .saveAsTable(f"{database}.{table}")
                 )
             else:
-                (
-                    bronze_dataflow_spec_df.write.mode("overwrite")
-                    .format("delta")
-                    .option("mergeSchema", "true")
-                    .save(path=dict_obj["bronze_dataflowspec_path"])
-                )
+                gold_dataflow_spec_df.write.mode("overwrite").format("delta").option(
+                    "mergeSchema", "true"
+                ).save(dict_obj["gold_dataflowspec_path"])
         else:
             if self.uc_enabled:
                 original_dataflow_df = self.spark.read.format("delta").table(
@@ -364,21 +626,88 @@ class OnboardDataflowspec:
                 )
             else:
                 self.deltaPipelinesMetaStoreOps.register_table_in_metastore(
-                    database, table, dict_obj["bronze_dataflowspec_path"]
+                    database, table, dict_obj["gold_dataflowspec_path"]
                 )
                 original_dataflow_df = self.spark.read.format("delta").load(
-                    dict_obj["bronze_dataflowspec_path"]
+                    dict_obj["gold_dataflowspec_path"]
                 )
-
-            logger.info("In Merge block for Bronze")
+            logger.info("In Merge block for Gold")
             self.deltaPipelinesInternalTableOps.merge(
-                bronze_dataflow_spec_df,
+                gold_dataflow_spec_df,
                 f"{database}.{table}",
                 ["dataFlowId"],
                 original_dataflow_df.columns,
             )
         if not self.uc_enabled:
-            self.register_bronze_dataflow_spec_tables()
+            self.register_gold_dataflow_spec_tables()
+
+    def __update_goldtransform_schema(self, path, schema):
+        """
+        This function updates a schema for a data flow specification based on a JSON file.
+        Args:
+            path ([Path]): The path to the JSON file containing the data to be processed
+            schema ([StructType]): The schema parameter is a StructType object that defines the structure of the
+                                   DataFrame to be created from the data. It specifies the names and 
+                                   data types of the columns in the DataFrame
+        Returns:
+            A DataFrame object that contains the transformed data from the input JSON file.
+        """
+        if(path.lower().endswith("yaml") or path.lower().endswith("yml")) :
+            yamlBody = self.spark.read.format("text").option("lineSep","\k").load(path).collect().pop()["value"]
+            rows = self.spark.createDataFrame(data=yaml.safe_load(yamlBody), schema = schema).collect()
+        else :
+            rows = self.spark.read.option("multiline", "true").json(path).collect()
+        dict_obj = self.gold_dict_obj
+        env = dict_obj["env"]
+        data = []
+        sourcedata = []
+        for row in rows:
+            dlt_views=row["dlt_views"]
+            target_table=row["target_table"]
+            pii_fields={}
+            sources = row["sources"]
+            for source in sources:
+                if source:
+                    pii_fields = {}
+                    if("pii_fields" in source) :
+                        if(type(source["pii_fields"]) is dict):
+                            json_pii_fields  = source["pii_fields"]
+                        else :
+                            json_pii_fields  = source["pii_fields"].asDict()
+                        for piiField in json_pii_fields :
+                            if(json_pii_fields[piiField]):
+                                pii_fields[piiField] = json_pii_fields[piiField]
+                    else :
+                        pii_fields = {}
+                    if("filter_condition" in source) :
+                        filter_condition = source["filter_condition"]
+                    else :
+                        filter_condition = ""
+                    filter_condition = source["filter_condition"]
+                    #isDlt = source["isDlt"]
+                    reference_name = source["reference_name"]
+                    #source_path_{env} = source[f"source_path_{env}"]
+                    # source_catalog= source["source_catalog"] if "source_catalog" in source else ""
+                    source_table = source["source_table"]
+                    source_is_streaming = source["is_streaming"] if "is_streaming" in source else "false"
+                    sourceRow = (
+                        filter_condition,
+                        pii_fields,
+                        reference_name,
+                        # source_catalog,
+                        source_table,
+                        source_is_streaming
+                    )
+                    sourcedata.append(sourceRow)
+            dataRow = (
+                dlt_views,
+                sourcedata,
+                target_table
+            )
+            data.append(dataRow)
+            sourcedata = []
+        data_flow_spec_rows_df = self.spark.createDataFrame(data, schema)
+        return data_flow_spec_rows_df
 
     def __delete_none(self, _dict):
         """Delete None values recursively from all of the dictionaries"""
@@ -474,10 +803,17 @@ class OnboardDataflowspec:
             "dataQualityExpectations",
             "quarantineTargetDetails",
             "quarantineTableProperties",
+            "writerConfigOptions",
             "appendFlows",
             "appendFlowsSchemas",
             "clusterBy",
             "targetPiiFields",
+            "isStreaming",
+            "flattenNestedData",
+            "columnToExtract",
+            "version",
+            "description",
+            "metadata",
             # "abTranslatorConfig",
             # "abValidationRules", 
             # "abMessageTypes",
@@ -507,13 +843,13 @@ class OnboardDataflowspec:
                 StructField("cdcApplyChanges", StringType(), True),
                 StructField("applyChangesFromSnapshot", StringType(), True),
                 StructField("dataQualityExpectations", StringType(), True),
-                StructField(
-                    "quarantineTargetDetails",
+                StructField("quarantineTargetDetails",MapType(StringType(), StringType(), True),True,),
+                StructField("quarantineTableProperties",
                     MapType(StringType(), StringType(), True),
                     True,
                 ),
                 StructField(
-                    "quarantineTableProperties",
+                    "writerConfigOptions",
                     MapType(StringType(), StringType(), True),
                     True,
                 ),
@@ -521,6 +857,21 @@ class OnboardDataflowspec:
                 StructField("appendFlowsSchemas", MapType(StringType(), StringType(), True), True),
                 StructField("clusterBy", ArrayType(StringType(), True), True),
                 StructField("targetPiiFields",MapType(StringType(), StringType(), True),True,),
+                StructField("isStreaming", StringType(), True),
+                StructField("flattenNestedData", StringType(), True),
+                StructField("columnToExtract", ArrayType(StringType(), True), True),
+                StructField("version", StringType(), True),
+                StructField("description", StringType(), True),
+                StructField("metadata", StructType([
+                    StructField("created_by", StringType(), True),
+                    StructField("created_date", StringType(), True),
+                    StructField("last_modified", StringType(), True),
+                    StructField("business_owner", StringType(), True),
+                    StructField("data_classification", StringType(), True),
+                    StructField("retention_policy", StringType(), True),
+                    StructField("compliance_requirements", StringType(), True),
+                    StructField("tags", StringType(), True)
+                ]), True)
                 # StructField("abTranslatorConfig", MapType(StringType(), StringType(), True), True),
                 # StructField("abValidationRules", MapType(StringType(), StringType(), True), True),
                 # StructField("abMessageTypes", ArrayType(StringType(), True), True),
@@ -532,10 +883,9 @@ class OnboardDataflowspec:
             "data_flow_id",
             "data_flow_group",
             "source_details",
-            f"bronze_database_{env}",
-            "bronze_table",
+            "bronze",
             "bronze_reader_options",
-        ]  # , f"bronze_table_path_{env}"
+        ]
         for onboarding_row in onboarding_rows:
             try:
                 self.__validate_mandatory_fields(onboarding_row, mandatory_fields)
@@ -550,6 +900,9 @@ class OnboardDataflowspec:
             source_format = onboarding_row["source_format"]
             if source_format.lower() not in [
                 "cloudfiles",
+                "csv",
+                "parquet",
+                "json",
                 "eventhub",
                 "kafka",
                 "delta",
@@ -565,84 +918,118 @@ class OnboardDataflowspec:
             )
             bronze_target_format = "delta"
             bronze_target_details = {
-                "database": onboarding_row["bronze_database_{}".format(env)],
-                "table": onboarding_row["bronze_table"],
+                "database": onboarding_row["bronze"]["target_details"]["catalog"]+"."+onboarding_row["bronze"]["target_details"]["schema"],
+                "table": onboarding_row["bronze"]["target_details"]["table"],
             }
             if not self.uc_enabled:
-                if f"bronze_table_path_{env}" in onboarding_row:
-                    bronze_target_details["path"] = onboarding_row[f"bronze_table_path_{env}"]
+                if "path" in onboarding_row["bronze"]["target_details"]:
+                    bronze_target_details["path"] = onboarding_row["bronze"]["target_details"]["path"]
                 else:
                     raise Exception(f"bronze_table_path_{env} not provided in onboarding_row={onboarding_row}")
             bronze_table_properties = {}
             if (
-                "bronze_table_properties" in onboarding_row
-                and onboarding_row["bronze_table_properties"]
+                "bronze_table_properties" in onboarding_row["bronze"]
+                and onboarding_row["bronze"]["bronze_table_properties"]
             ):
                 bronze_table_properties = self.__delete_none(
-                    onboarding_row["bronze_table_properties"].asDict()
+                    onboarding_row["bronze"]["bronze_table_properties"].asDict()
                 )
 
             partition_columns = [""]
             if (
-                "bronze_partition_columns" in onboarding_row
-                and onboarding_row["bronze_partition_columns"]
+                "bronze_partition_columns" in onboarding_row["bronze"]
+                and onboarding_row["bronze"]["bronze_partition_columns"]
             ):
                 # Split if this is a list separated by commas
-                if "," in onboarding_row["bronze_partition_columns"]:
-                    partition_columns = onboarding_row["bronze_partition_columns"].split(",")
+                if "," in onboarding_row["bronze"]["bronze_partition_columns"]:
+                    partition_columns = onboarding_row["bronze"]["bronze_partition_columns"].split(",")
                 else:
-                    partition_columns = [onboarding_row["bronze_partition_columns"]]
+                    partition_columns = [onboarding_row["bronze"]["bronze_partition_columns"]]
 
-            cluster_by = self.__get_cluster_by_properties(onboarding_row, bronze_table_properties,
-                                                          "bronze_cluster_by")
+            cluster_by = self.__get_cluster_by_properties(onboarding_row, "bronze", bronze_table_properties, "cluster_by")
 
             cdc_apply_changes = None
             if (
-                "bronze_cdc_apply_changes" in onboarding_row
-                and onboarding_row["bronze_cdc_apply_changes"]
+                "cdc_apply_changes" in onboarding_row["bronze"]
+                and onboarding_row["bronze"]["cdc_apply_changes"]
             ):
                 self.__validate_apply_changes(onboarding_row, "bronze")
                 cdc_apply_changes = json.dumps(
                     self.__delete_none(
-                        onboarding_row["bronze_cdc_apply_changes"].asDict()
+                        onboarding_row["bronze"]["cdc_apply_changes"].asDict()
                     )
                 )
             apply_changes_from_snapshot = None
-            if ("bronze_apply_changes_from_snapshot" in onboarding_row
-                    and onboarding_row["bronze_apply_changes_from_snapshot"]):
+            if ("apply_changes_from_snapshot" in onboarding_row["bronze"]
+                    and onboarding_row["bronze"]["apply_changes_from_snapshot"]):
                 self.__validate_apply_changes_from_snapshot(onboarding_row, "bronze")
                 apply_changes_from_snapshot = json.dumps(
-                    self.__delete_none(onboarding_row["bronze_apply_changes_from_snapshot"].asDict())
+                    self.__delete_none(onboarding_row["bronze"]["apply_changes_from_snapshot"].asDict())
                 )
             data_quality_expectations = None
             quarantine_target_details = {}
             quarantine_table_properties = {}
-            if f"bronze_data_quality_expectations_json_{env}" in onboarding_row:
-                bronze_data_quality_expectations_json = onboarding_row[
-                    f"bronze_data_quality_expectations_json_{env}"
-                ]
+            if f"bronze_data_quality_expectations_json_{env}" in onboarding_row["bronze"]:
+                bronze_data_quality_expectations_json = onboarding_row["bronze"][f"bronze_data_quality_expectations_json_{env}"]
                 if bronze_data_quality_expectations_json:
                     data_quality_expectations = self.__get_data_quality_expecations(
                         bronze_data_quality_expectations_json
                     )
-                    if onboarding_row["bronze_quarantine_table"]:
-                        quarantine_target_details, quarantine_table_properties = self.__get_quarantine_details(
-                            env, onboarding_row
-                        )
+            if ("bronze_quarantine_table" in onboarding_row["bronze"] and onboarding_row["bronze"]["bronze_quarantine_table"]):
+                quarantine_target_details, quarantine_table_properties = self.__get_quarantine_details(env, onboarding_row, "bronze")
+            
+            writer_config_options = {}
+            if (
+                "bronze_writer_config_options" in onboarding_row["bronze"] and onboarding_row["bronze"]["bronze_writer_config_options"]
+            ):
+                writer_config_options = self.__delete_none(
+                    onboarding_row["bronze"]["bronze_writer_config_options"].asDict())
             
             targetPiiFields = {}
             if (
-                "targetPiiFields" in onboarding_row
-                and onboarding_row["targetPiiFields"]
+                "targetPiiFields" in onboarding_row["bronze"]
+                and onboarding_row["bronze"]["targetPiiFields"]
             ):
-                print(onboarding_row["targetPiiFields"])
+                print(onboarding_row["bronze"]["targetPiiFields"])
                 targetPiiFields = self.__delete_none(
-                    onboarding_row["targetPiiFields"].asDict()
+                    onboarding_row["bronze"]["targetPiiFields"].asDict()
                     )
 
             append_flows, append_flows_schemas = self.get_append_flows_json(
                 onboarding_row, "bronze", env
             )
+            
+            if "is_streaming" in onboarding_row["bronze"] and onboarding_row["bronze"]["is_streaming"]:
+                isStreaming = onboarding_row["bronze"]["is_streaming"]
+            else:
+                isStreaming = None
+            
+            if "flatten_nested_data" in onboarding_row and onboarding_row["flatten_nested_data"]:
+                flattenNestedData = onboarding_row["flatten_nested_data"]
+            else:
+                flattenNestedData = None
+
+            if "column_to_extract" in onboarding_row and onboarding_row["column_to_extract"]:
+                columnToExtract = onboarding_row["column_to_extract"]
+            else:
+                columnToExtract = None
+
+            if "version" in onboarding_row and onboarding_row["version"]:
+                version = onboarding_row["version"]
+            else:
+                version = None
+            
+            if "description" in onboarding_row and onboarding_row["description"]:
+                description = onboarding_row["description"]
+            else:
+                description = None
+
+            if "metadata" in onboarding_row and onboarding_row["metadata"]:
+                metadata = onboarding_row["metadata"]
+            else:
+                metadata = None
+            
+
             # ab_translator_config, ab_validation_rules, ab_message_types = self.process_ab_config(self, obnoring_row, env)
 
             bronze_row = (
@@ -661,10 +1048,17 @@ class OnboardDataflowspec:
                 data_quality_expectations,
                 quarantine_target_details,
                 quarantine_table_properties,
+                writer_config_options,
                 append_flows,
                 append_flows_schemas,
                 cluster_by,
                 targetPiiFields,
+                isStreaming,
+                flattenNestedData,
+                columnToExtract,
+                version,
+                description,
+                metadata,
                 # ab_translator_config,
                 # ab_validation_rules,
                 # ab_message_types
@@ -678,49 +1072,49 @@ class OnboardDataflowspec:
 
         return data_flow_spec_rows_df
 
-    def __get_cluster_by_properties(self, onboarding_row, table_properties, cluster_key):
+    def __get_cluster_by_properties(self, onboarding_row, layer, table_properties, cluster_key):
         cluster_by = None
-        if cluster_key in onboarding_row and onboarding_row[cluster_key]:
+        if cluster_key in onboarding_row[f"{layer}"] and onboarding_row[f"{layer}"][cluster_key]:
             if table_properties.get('pipelines.autoOptimize.zOrderCols', None) is not None:
                 raise Exception(f"Can not support zOrder and cluster_by together at {cluster_key}")
-            cluster_by = onboarding_row[cluster_key]
+            cluster_by = onboarding_row[f"{layer}"][cluster_key]
         return cluster_by
 
-    def __get_quarantine_details(self, env, onboarding_row):
+    def __get_quarantine_details(self, env, onboarding_row, layer):
         quarantine_table_partition_columns = ""
         quarantine_target_details = {}
         quarantine_table_properties = {}
         quarantine_table_cluster_by = None
         if (
-            "bronze_quarantine_table_partitions" in onboarding_row
-            and onboarding_row["bronze_quarantine_table_partitions"]
+            "bronze_quarantine_table_partitions" in onboarding_row[f"{layer}"]
+            and onboarding_row[f"{layer}"]["bronze_quarantine_table_partitions"]
         ):
             # Split if this is a list separated by commas
-            if "," in onboarding_row["bronze_quarantine_table_partitions"]:
-                quarantine_table_partition_columns = onboarding_row["bronze_quarantine_table_partitions"].split(",")
+            if "," in onboarding_row[f"{layer}"]["bronze_quarantine_table_partitions"]:
+                quarantine_table_partition_columns = onboarding_row[f"{layer}"]["bronze_quarantine_table_partitions"].split(",")
             else:
-                quarantine_table_partition_columns = onboarding_row["bronze_quarantine_table_partitions"]
+                quarantine_table_partition_columns = onboarding_row[f"{layer}"]["bronze_quarantine_table_partitions"]
         if (
-            "bronze_quarantine_table_properties" in onboarding_row
-            and onboarding_row["bronze_quarantine_table_properties"]
+            "bronze_quarantine_table_properties" in onboarding_row[f"{layer}"]
+            and onboarding_row[f"{layer}"]["bronze_quarantine_table_properties"]
         ):
             quarantine_table_properties = self.__delete_none(
-                onboarding_row["bronze_quarantine_table_properties"].asDict()
+                onboarding_row[f"{layer}"]["bronze_quarantine_table_properties"].asDict()
             )
 
-        quarantine_table_cluster_by = self.__get_cluster_by_properties(onboarding_row, quarantine_table_properties,
+        quarantine_table_cluster_by = self.__get_cluster_by_properties(onboarding_row, layer, quarantine_table_properties,
                                                                        "bronze_quarantine_table_cluster_by")
         if (
-            f"bronze_database_quarantine_{env}" in onboarding_row
-            and onboarding_row[f"bronze_database_quarantine_{env}"]
+            f"bronze_database_quarantine_{env}" in onboarding_row[f"{layer}"]
+            and onboarding_row[f"{layer}"][f"bronze_database_quarantine_{env}"]
         ):
-            quarantine_target_details = {"database": onboarding_row[f"bronze_database_quarantine_{env}"],
-                                         "table": onboarding_row["bronze_quarantine_table"],
+            quarantine_target_details = {"database": onboarding_row[f"{layer}"][f"bronze_database_quarantine_{env}"],
+                                         "table": onboarding_row[f"{layer}"]["bronze_quarantine_table"],
                                          "partition_columns": quarantine_table_partition_columns,
                                          "cluster_by": quarantine_table_cluster_by
                                          }
-        if not self.uc_enabled and f"bronze_quarantine_table_path_{env}" in onboarding_row:
-            quarantine_target_details["path"] = onboarding_row[f"bronze_quarantine_table_path_{env}"]
+        if not self.uc_enabled and f"bronze_quarantine_table_path_{env}" in onboarding_row[f"{layer}"]:
+            quarantine_target_details["path"] = onboarding_row[f"{layer}"][f"bronze_quarantine_table_path_{env}"]
 
         return quarantine_target_details, quarantine_table_properties
 
@@ -789,7 +1183,7 @@ class OnboardDataflowspec:
     # return ab_translator_config, ab_validation_rules, ab_message_types
 
     def __validate_apply_changes(self, onboarding_row, layer):
-        cdc_apply_changes = onboarding_row[f"{layer}_cdc_apply_changes"]
+        cdc_apply_changes = onboarding_row[f"{layer}"]["cdc_apply_changes"]
         json_cdc_apply_changes = self.__delete_none(cdc_apply_changes.asDict())
         logger.info(f"actual mergeInfo={json_cdc_apply_changes}")
         payload_keys = json_cdc_apply_changes.keys()
@@ -818,7 +1212,7 @@ class OnboardDataflowspec:
             )
 
     def __validate_apply_changes_from_snapshot(self, onboarding_row, layer):
-        apply_changes_from_snapshot = onboarding_row[f"{layer}_apply_changes_from_snapshot"]
+        apply_changes_from_snapshot = onboarding_row[f"{layer}"]["apply_changes_from_snapshot"]
         json_apply_changes_from_snapshot = self.__delete_none(apply_changes_from_snapshot.asDict())
         logger.info(f"actual applyChangesFromSnapshot={json_apply_changes_from_snapshot}")
         payload_keys = json_apply_changes_from_snapshot.keys()
@@ -872,7 +1266,10 @@ class OnboardDataflowspec:
             source_details_file = self.__delete_none(source_details_json.asDict())
             if (source_format.lower() == "cloudfiles"
                     or source_format.lower() == "delta"
-                    or source_format.lower() == "snapshot"):
+                    or source_format.lower() == "snapshot"
+                    or source_format.lower() == "csv"
+                    or source_format.lower() == "json"
+                    or source_format.lower() == "parquet"):
                 if f"source_path_{env}" in source_details_file:
                     source_details["path"] = source_details_file[f"source_path_{env}"]
                 if "source_database" in source_details_file:
@@ -1162,3 +1559,176 @@ class OnboardDataflowspec:
             data, data_flow_spec_schema
         ).toDF(*data_flow_spec_columns)
         return data_flow_spec_rows_df
+
+    def __get_gold_dataflow_spec_dataframe(self, onboarding_df, env):
+        """Get gold_dataflow_spec method transform onboarding dataframe to silver dataflowSpec dataframe.
+
+        Args:
+            onboarding_df ([type]): [description]
+            spark (SparkSession): [description]
+
+        Returns:
+            [type]: [description]
+        """
+        data_flow_spec_columns = [
+            "dataFlowId",
+            "dataFlowGroup",
+            "isStreaming", 
+            # "sourceFormat", Not needed
+            # "sourceDetails", Not needed
+            # "readerConfigOptions", not needed
+            "targetFormat",
+            "targetDetails",
+            "tableProperties",
+            # "sources",
+            # "dlt_views"
+            "partitionColumns",
+            "cdcApplyChanges",
+            "dataQualityExpectations",
+            "appendFlows", #check relevance
+            "appendFlowsSchemas",
+            "clusterBy",
+            "targetPiiFields"
+        ]
+        data_flow_spec_schema = StructType(
+            [
+                StructField("dataFlowId", StringType(), True),
+                StructField("dataFlowGroup", StringType(), True),
+                StructField("isStreaming", StringType(), True),
+                StructField("targetFormat", StringType(), True),
+                StructField("targetDetails", MapType(StringType(), StringType(), True), True),
+                StructField("tableProperties", MapType(StringType(), StringType(), True), True),
+                StructField("partitionColumns", ArrayType(StringType(), True), True),
+                StructField("cdcApplyChanges", StringType(), True),
+                StructField("dataQualityExpectations", StringType(), True),
+                StructField("appendFlows", StringType(), True),
+                StructField("appendFlowsSchemas", MapType(StringType(), StringType(), True), True),
+                StructField("clusterBy", ArrayType(StringType(), True), True),
+                StructField("targetPiiFields",MapType(StringType(), StringType(), True),True,)
+            ]
+        )
+        data = []
+
+        onboarding_rows = onboarding_df.collect()
+        mandatory_fields = [
+            "data_flow_id",
+            "data_flow_group",
+            f"gold_database_{env}",
+            "gold_table",
+            f"gold_transformation_json_{env}",
+        ]  # f"gold_table_path_{env}",
+
+        for onboarding_row in onboarding_rows:
+            try:
+                self.__validate_mandatory_fields(onboarding_row, mandatory_fields)
+            except ValueError:
+                mandatory_fields.append(f"gold_table_path_{env}")
+                self.__validate_mandatory_fields(onboarding_row, mandatory_fields)
+            gold_data_flow_spec_id = onboarding_row["data_flow_id"]
+            gold_data_flow_spec_group = onboarding_row["data_flow_group"]
+            gold_is_streaming = onboarding_row["is_streaming"]
+            # gold_reader_config_options = {}
+
+            gold_target_format = "delta"
+
+            # silver_target_details = {
+            #     "database": onboarding_row["silver_database_{}".format(env)],
+            #     "table": onboarding_row["silver_table"],
+            # }
+            gold_target_details = {
+                "database": onboarding_row["gold_database_{}".format(env)],
+                "table": onboarding_row["gold_table"],
+            }
+
+            if not self.uc_enabled:
+                # silver_target_details["path"] = onboarding_row[
+                #     f"silver_table_path_{env}"
+                # ]
+                gold_target_details["path"] = onboarding_row[
+                    f"gold_table_path_{env}"
+                ]
+
+            gold_table_properties = {}
+            if (
+                "gold_table_properties" in onboarding_row
+                and onboarding_row["gold_table_properties"]
+            ):
+                gold_table_properties = self.__delete_none(
+                    onboarding_row["gold_table_properties"].asDict()
+                )
+
+            gold_parition_columns = [""]
+            if (
+                "gold_partition_columns" in onboarding_row
+                and onboarding_row["gold_partition_columns"]
+            ):
+                # Split if this is a list separated by commas
+                if "," in onboarding_row["gold_partition_columns"]:
+                    gold_parition_columns = onboarding_row["gold_partition_columns"].split(",")
+                else:
+                    gold_parition_columns = [onboarding_row["gold_partition_columns"]]
+
+            gold_cluster_by = self.__get_cluster_by_properties(onboarding_row, gold_table_properties,
+                                                                 "gold_cluster_by")
+
+            gold_cdc_apply_changes = None
+            if (
+                "gold_cdc_apply_changes" in onboarding_row
+                and onboarding_row["gold_cdc_apply_changes"]
+            ):
+                self.__validate_apply_changes(onboarding_row, "gold")
+                gold_cdc_apply_changes_row = onboarding_row[
+                    "gold_cdc_apply_changes"
+                ]
+                if self.onboard_file_type == "json":
+                    gold_cdc_apply_changes = json.dumps(
+                        self.__delete_none(gold_cdc_apply_changes_row.asDict())
+                    )
+
+            data_quality_expectations = None
+            if f"gold_data_quality_expectations_json_{env}" in onboarding_row:
+                gold_data_quality_expectations_json = onboarding_row[
+                    f"gold_data_quality_expectations_json_{env}"
+                ]
+                if gold_data_quality_expectations_json:
+                    data_quality_expectations = self.__get_data_quality_expecations(
+                        gold_data_quality_expectations_json
+                    )
+            append_flows, append_flow_schemas = self.get_append_flows_json(
+                onboarding_row, layer="gold", env=env
+            )
+            targetPiiFields = {}
+            if (
+                "targetPiiFields" in onboarding_row
+                and onboarding_row["targetPiiFields"]
+            ):
+                print(onboarding_row["targetPiiFields"])
+                targetPiiFields = self.__delete_none(
+                    onboarding_row["targetPiiFields"].asDict()
+                    )
+
+            gold_row = (
+                gold_data_flow_spec_id,
+                gold_data_flow_spec_group,
+                gold_is_streaming,
+                # silver_target_details,
+                # gold_reader_config_options,
+                gold_target_format,
+                gold_target_details,
+                gold_table_properties,
+                gold_parition_columns,
+                gold_cdc_apply_changes,
+                data_quality_expectations,
+                append_flows,
+                append_flow_schemas,
+                gold_cluster_by,
+                targetPiiFields
+            )
+            data.append(gold_row)
+            logger.info(f"gold_data ==== {data}")
+
+        data_flow_spec_rows_df = self.spark.createDataFrame(
+            data, data_flow_spec_schema
+        ).toDF(*data_flow_spec_columns)
+        return data_flow_spec_rows_df
+

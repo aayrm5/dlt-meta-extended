@@ -1,0 +1,277 @@
+[{
+  "data_flow_id": "1",
+  "data_flow_group": "hkjc-streaming-dashboard-usecase",
+  "source_format": "kafka",
+  "source_details": {
+    "kafka.bootstrap.servers": "kafka.confluent.edap.corpdev.hkjc.com:9092",
+    "subscribe": "edap-s-ap-fo-activity",
+    "kafka.security.protocol": "SSL",
+    "kafka.ssl.truststore.location": "/Volumes/edap/default/certificates/truststore/kafka_truststore.jks",
+    "kafka.ssl.keystore.location": "/Volumes/edap/default/certificates/keystore/kafka_keystore.jks",
+    "kafka.ssl.truststore.secrets.scope": "akv-secrets-etl",
+    "kafka.ssl.truststore.secrets.key": "capemm-truststore-pwd",
+    "kafka.ssl.keystore.secrets.scope": "akv-secrets-etl",
+    "kafka.ssl.keystore.secrets.key": "capemm-keystore-pwd",
+    "maxOffsetsPerTrigger": "10000",
+    "kafka.session.timeout.ms": "30000",
+    "kafka.request.timeout.ms": "60000"
+  },
+  "bronze_reader_options": {
+    "includeHeaders": "true",
+    "startingOffsets": "earliest",
+    "maxOffsetsPerTrigger": "10000",
+    "minPartitions": "3",
+    "failOnDataLoss": "false",
+    "kafka.session.timeout.ms": "30000",
+    "kafka.request.timeout.ms": "60000",
+    "kafka.fetch.min.bytes": "1024",
+    "kafka.fetch.max.wait.ms": "5000",
+    "kafka.max.partition.fetch.bytes": "1048576"
+  },
+  "bronze": {
+    "target_details": {
+      "catalog": "edap_dev",
+      "schema": "stg_ak",
+      "table": "raw_sb_bet_transactions_fo",
+      "path": "/Volumes/dlt_meta_uc/dlt_meta_gold_schema/gold_volume/data/gold/stores/"
+    },
+    "target_pii_fields": {
+      "value" : "String"
+    },
+    "partition_columns": [
+    ],
+    "cluster_by": [
+    ],
+    "is_partitioned_by_run_date": "false",
+    "is_streaming": "true",
+    "bronze_table_properties": {
+      "delta.autoOptimize.optimizeWrite": "true",
+      "delta.autoOptimize.autoCompact": "true",
+      "delta.enableChangeDataFeed": "true",
+      "delta.logRetentionDuration": "interval 30 days",
+      "delta.deletedFileRetentionDuration": "interval 7 days",
+      "delta.tuneFileSizesForRewrites": "true"
+    },
+    "bronze_writer_config_options": {
+      "mergeSchema": "true",
+      "includeIngestionTimeAsColumn" : "true"
+    },
+    "bronze_data_quality_expectations_json_dev": "",
+    "bronze_database_quarantine_dev": "",
+    "bronze_quarantine_table": "",
+    "bronze_quarantine_table_properties": {
+      "delta.autoOptimize.optimizeWrite": "true",
+      "delta.logRetentionDuration": "interval 90 days"
+    }
+  },
+  "flatten_nested_data": "false",
+  "column_to_extract": "",
+  "version": "2.0",
+  "description": "Kafka-based real-time customer data pipeline with Unity Catalog support (catalog.schema.table structure), comprehensive PII encryption/decryption, data quality validation, and CDC support for customer event processing",
+  "metadata": {
+    "created_by": "data-engineering-team",
+    "created_date": "2024-01-15",
+    "last_modified": "2024-01-15",
+    "business_owner": "customer-analytics-team",
+    "data_classification": "confidential",
+    "retention_policy": "7_years",
+    "compliance_requirements": [
+      "GDPR",
+      "CCPA",
+      "SOX"
+    ],
+    "tags": [
+      "customer-data",
+      "real-time",
+      "pii-encrypted",
+      "kafka-streaming",
+      "unity-catalog"
+    ]
+  }
+},
+{
+  "data_flow_id": "2",
+  "data_flow_group": "hkjc-streaming-dashboard-usecase",
+  "source_format": "kafka",
+  "source_details": {
+    "kafka.bootstrap.servers": "kafka.confluent.edap.corpdev.hkjc.com:9092",
+    "subscribe": "edap-s-ap-fo-activity",
+    "kafka.security.protocol": "SSL",
+    "kafka.ssl.truststore.location": "/Volumes/edap/default/certificates/truststore/kafka_truststore.jks",
+    "kafka.ssl.keystore.location": "/Volumes/edap/default/certificates/keystore/kafka_keystore.jks",
+    "kafka.ssl.truststore.secrets.scope": "akv-secrets-etl",
+    "kafka.ssl.truststore.secrets.key": "capemm-truststore-pwd",
+    "kafka.ssl.keystore.secrets.scope": "akv-secrets-etl",
+    "kafka.ssl.keystore.secrets.key": "capemm-keystore-pwd",
+    "maxOffsetsPerTrigger": "10000",
+    "kafka.session.timeout.ms": "30000",
+    "kafka.request.timeout.ms": "60000",
+    "source_schema_path": "file:/Workspace/Users/damanbansal@hkjccorpdev.onmicrosoft.com/aayrm5-dlt-meta/demo/resources/ddl/fo_data_schema.ddl"
+  },
+  "bronze_reader_options": {
+    "includeHeaders": "true",
+    "startingOffsets": "earliest",
+    "maxOffsetsPerTrigger": "10000",
+    "minPartitions": "3",
+    "failOnDataLoss": "false",
+    "kafka.session.timeout.ms": "30000",
+    "kafka.request.timeout.ms": "60000",
+    "kafka.fetch.min.bytes": "1024",
+    "kafka.fetch.max.wait.ms": "5000",
+    "kafka.max.partition.fetch.bytes": "1048576",
+    "custom_decode_fo": "true",
+    "custom_decode_trasaction_type": "BET_FO"
+  },
+  "bronze": {
+    "target_details": {
+      "catalog": "edap_dev",
+      "schema": "stg_ak",
+      "table": "ab_sb_bet_fo",
+      "path": "/Volumes/dlt_meta_uc/dlt_meta_gold_schema/gold_volume/data/gold/stores/"
+    },
+    "target_pii_fields": {
+    },
+    "partition_columns": [
+    ],
+    "cluster_by": [
+    ],
+    "is_partitioned_by_run_date": "false",
+    "is_streaming": "true",
+    "bronze_table_properties": {
+      "delta.autoOptimize.optimizeWrite": "true",
+      "delta.autoOptimize.autoCompact": "true",
+      "delta.enableChangeDataFeed": "true",
+      "delta.logRetentionDuration": "interval 30 days",
+      "delta.deletedFileRetentionDuration": "interval 7 days",
+      "delta.tuneFileSizesForRewrites": "true"
+    },
+    "bronze_writer_config_options": {
+      "mergeSchema": "true",
+      "includeIngestionTimeAsColumn" : "true"
+    },
+    "bronze_data_quality_expectations_json_dev": "file:/Workspace/Users/damanbansal@hkjccorpdev.onmicrosoft.com/aayrm5-dlt-meta/demo/conf/dqe/hkjc-kafka-bronze/decode_value_valid_json_fo.json",
+    "bronze_database_quarantine_dev": "edap_dev.stg_ak",
+    "bronze_quarantine_table": "ab_sb_bet_fo_reject",
+    "bronze_quarantine_table_properties": {
+      "delta.autoOptimize.optimizeWrite": "true",
+      "delta.logRetentionDuration": "interval 90 days"
+    }
+  },
+  "flatten_nested_data": "true",
+  "column_to_extract": "",
+  "version": "2.0",
+  "description": "Kafka-based real-time customer data pipeline with Unity Catalog support (catalog.schema.table structure), comprehensive PII encryption/decryption, data quality validation, and CDC support for customer event processing",
+  "metadata": {
+    "created_by": "data-engineering-team",
+    "created_date": "2024-01-15",
+    "last_modified": "2024-01-15",
+    "business_owner": "customer-analytics-team",
+    "data_classification": "confidential",
+    "retention_policy": "7_years",
+    "compliance_requirements": [
+      "GDPR",
+      "CCPA",
+      "SOX"
+    ],
+    "tags": [
+      "customer-data",
+      "real-time",
+      "pii-encrypted",
+      "kafka-streaming",
+      "unity-catalog"
+    ]
+  }
+},
+{
+  "data_flow_id": "3",
+  "data_flow_group": "hkjc-streaming-dashboard-usecase",
+  "source_format": "kafka",
+  "source_details": {
+    "kafka.bootstrap.servers": "kafka.confluent.edap.corpdev.hkjc.com:9092",
+    "subscribe": "edap-s-ap-fo-activity",
+    "kafka.security.protocol": "SSL",
+    "kafka.ssl.truststore.location": "/Volumes/edap/default/certificates/truststore/kafka_truststore.jks",
+    "kafka.ssl.keystore.location": "/Volumes/edap/default/certificates/keystore/kafka_keystore.jks",
+    "kafka.ssl.truststore.secrets.scope": "akv-secrets-etl",
+    "kafka.ssl.truststore.secrets.key": "capemm-truststore-pwd",
+    "kafka.ssl.keystore.secrets.scope": "akv-secrets-etl",
+    "kafka.ssl.keystore.secrets.key": "capemm-keystore-pwd",
+    "maxOffsetsPerTrigger": "10000",
+    "kafka.session.timeout.ms": "30000",
+    "kafka.request.timeout.ms": "60000",
+    "source_schema_path": "file:/Workspace/Users/damanbansal@hkjccorpdev.onmicrosoft.com/aayrm5-dlt-meta/demo/resources/ddl/fo_data_schema.ddl"
+  },
+  "bronze_reader_options": {
+    "includeHeaders": "true",
+    "startingOffsets": "earliest",
+    "maxOffsetsPerTrigger": "10000",
+    "minPartitions": "3",
+    "failOnDataLoss": "false",
+    "kafka.session.timeout.ms": "30000",
+    "kafka.request.timeout.ms": "60000",
+    "kafka.fetch.min.bytes": "1024",
+    "kafka.fetch.max.wait.ms": "5000",
+    "kafka.max.partition.fetch.bytes": "1048576",
+    "custom_decode_fo": "true",
+    "custom_decode_trasaction_type": "BET_FO_CANCEL"
+  },
+  "bronze": {
+    "target_details": {
+      "catalog": "edap_dev",
+      "schema": "stg_ak",
+      "table": "ab_sb_cancel_fo",
+      "path": "/Volumes/dlt_meta_uc/dlt_meta_gold_schema/gold_volume/data/gold/stores/"
+    },
+    "target_pii_fields": {
+    },
+    "partition_columns": [
+    ],
+    "cluster_by": [
+    ],
+    "is_partitioned_by_run_date": "false",
+    "is_streaming": "true",
+    "bronze_table_properties": {
+      "delta.autoOptimize.optimizeWrite": "true",
+      "delta.autoOptimize.autoCompact": "true",
+      "delta.enableChangeDataFeed": "true",
+      "delta.logRetentionDuration": "interval 30 days",
+      "delta.deletedFileRetentionDuration": "interval 7 days",
+      "delta.tuneFileSizesForRewrites": "true"
+    },
+    "bronze_writer_config_options": {
+      "mergeSchema": "true",
+      "includeIngestionTimeAsColumn" : "true"
+    },
+    "bronze_data_quality_expectations_json_dev": "file:/Workspace/Users/damanbansal@hkjccorpdev.onmicrosoft.com/aayrm5-dlt-meta/demo/conf/dqe/hkjc-kafka-bronze/decode_value_valid_json_fo.json",
+    "bronze_database_quarantine_dev": "edap_dev.stg_ak",
+    "bronze_quarantine_table": "ab_sb_cancel_fo_reject",
+    "bronze_quarantine_table_properties": {
+      "delta.autoOptimize.optimizeWrite": "true",
+      "delta.logRetentionDuration": "interval 90 days"
+    }
+  },
+  "flatten_nested_data": "true",
+  "column_to_extract": "",
+  "version": "2.0",
+  "description": "Kafka-based real-time customer data pipeline with Unity Catalog support (catalog.schema.table structure), comprehensive PII encryption/decryption, data quality validation, and CDC support for customer event processing",
+  "metadata": {
+    "created_by": "data-engineering-team",
+    "created_date": "2024-01-15",
+    "last_modified": "2024-01-15",
+    "business_owner": "customer-analytics-team",
+    "data_classification": "confidential",
+    "retention_policy": "7_years",
+    "compliance_requirements": [
+      "GDPR",
+      "CCPA",
+      "SOX"
+    ],
+    "tags": [
+      "customer-data",
+      "real-time",
+      "pii-encrypted",
+      "kafka-streaming",
+      "unity-catalog"
+    ]
+  }
+}]

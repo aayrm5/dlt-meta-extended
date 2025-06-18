@@ -11,8 +11,8 @@ from src.__about__ import __version__
 from src.dataflow_spec import BronzeDataflowSpec, SilverDataflowSpec, GoldDataflowSpec, DataflowSpecUtils
 from src.pipeline_readers import PipelineReaders
 from src.ab_cancel_translator_integration import ABCancelTranslatorPipeline
-from src.dataflow_pipeline_bronze import BronzeDataflowPipeline
 from src.dataflow_pipeline_gold import GoldDataflowPipeline,GoldSourceProcessingUtils,GoldDltViewUtils
+from src.dataflow_utils import DataflowUtils
 
 logger = logging.getLogger('databricks.labs.dltmeta')
 logger.setLevel(logging.INFO)
@@ -131,7 +131,6 @@ class DataflowPipeline:
         else:
             self.silver_schema = None
         
-        self.bronze_pipeline = BronzeDataflowPipeline(spark, dataflow_spec, view_name, view_name_quarantine, self.encryptDataset, self.decryptDataset)
         self.gold_pipeline = GoldDataflowPipeline(spark, dataflow_spec, view_name, view_name_quarantine, self.encryptDataset, self.decryptDataset)
 
     def table_has_expectations(self):
@@ -176,6 +175,7 @@ class DataflowPipeline:
                     append_flow.source_format,
                     append_flow.source_details,
                     append_flow.reader_options,
+                    self.dataflowSpec,
                     json.loads(flow_schema) if flow_schema else None
                 )
                 if append_flow.source_format == "cloudFiles":
@@ -284,20 +284,24 @@ class DataflowPipeline:
             self.dataflowSpec.sourceFormat,
             self.dataflowSpec.sourceDetails,
             self.dataflowSpec.readerConfigOptions,
-            self.schema_json
+            self.dataflowSpec,
+            self.schema_json,
+            self.dataflowSpec.writerConfigOptions
         )
 
         # ab_translator = ABCancelTranslatorPipeline(self.spark, bronze_dataflow_spec)
         if bronze_dataflow_spec.sourceFormat == "cloudFiles" and bronze_dataflow_spec.isStreaming == "true":
-            input_df = self.bronze_pipeline.read_source_streaming()
+            input_df = self.read_source_streaming()
+
         elif (bronze_dataflow_spec.sourceFormat == "csv" or bronze_dataflow_spec.sourceFormat == "parquet" or bronze_dataflow_spec.sourceFormat == "json" or bronze_dataflow_spec.sourceFormat == "delta" ):
             if bronze_dataflow_spec.isStreaming == "false":
-                input_df = self.bronze_pipeline.read_source_batch()
+                input_df = self.read_source_batch()
             else:
-                input_df = self.bronze_pipeline.read_source_streaming()
+                input_df = self.read_source_streaming()
             
         elif bronze_dataflow_spec.sourceFormat == "eventhub" or bronze_dataflow_spec.sourceFormat == "kafka":
             input_df = pipeline_reader.read_kafka()
+
         # elif bronze_dataflow_spec.sourceFormat.lower() in ["ab_binary_messages", "ab_cancel_messages"]:
         # # Handle AB message formats
         #     input_df = pipeline_reader.read_ab_binary_messages()  # Assume binary files
@@ -404,60 +408,59 @@ class DataflowPipeline:
         
         return final_data
     
-    # def read_gold(self) -> DataFrame:
-    #     """Read Gold tables with PII decryption/encryption support using centralized functions."""
-    #     logger.info("In read_gold func with centralized PII decryption/encryption")
-    #     gold_dataflow_spec: GoldDataflowSpec = self.dataflowSpec
-    #     source_database = gold_dataflow_spec.sourceDetails["database"]
-    #     source_table = gold_dataflow_spec.sourceDetails["table"]
-    #     select_exp = gold_dataflow_spec.selectExp
-    #     where_clause = gold_dataflow_spec.whereClause
-        
-    #     # Get PII field configurations
-    #     source_pii_fields = getattr(gold_dataflow_spec, 'gold_source_PiiFields', {})
-    #     target_pii_fields = getattr(gold_dataflow_spec, 'gold_target_PiiFields', {})
-        
-    #     # Read source data from bronze layer
-    #     raw_delta_table_stream = self.spark.readStream.table(
-    #         f"{source_database}.{source_table}"
-    #     ) if self.uc_enabled else self.spark.readStream.load(
-    #         path=gold_dataflow_spec.sourceDetails["path"],
-    #         format="delta"
-    #     )
-        
-    #     # Decrypt source PII fields from silver layer
-    #     decrypted_data = raw_delta_table_stream
-    #     if source_pii_fields and len(source_pii_fields) > 0:
-    #         logger.info(f"Decrypting source PII fields from silver: {list(source_pii_fields.keys())}")
-    #         decrypted_data = self.decryptDataset(
-    #             data=raw_delta_table_stream,
-    #             piiFields=source_pii_fields
-    #         )
-    #         logger.info("Source PII decryption completed for gold layer")
-    #     else:
-    #         logger.info("No source PII fields configured for decryption in gold layer")
-        
-    #     # Apply transformations 
-    #     transformed_data = decrypted_data.selectExpr(*select_exp)
-    #     transformed_data = self.__apply_where_clause(where_clause, transformed_data)
-        
-    #     # Apply custom transformations 
-    #     transformed_data = self.apply_custom_transform_fun(transformed_data)
-        
-    #     # ncrypt target PII fields for gold layer 
-    #     final_data = transformed_data
-    #     if target_pii_fields and len(target_pii_fields) > 0:
-    #         logger.info(f"Applying PII encryption to silver layer fields: {list(target_pii_fields.keys())}")
-    #         final_data = self.encryptDataset(
-    #             data=transformed_data,
-    #             piiFields=target_pii_fields,
-    #             df_spec=gold_dataflow_spec
-    #         )
-    #         logger.info("Target PII encryption completed for gold layer")
-    #     else:
-    #         logger.info("No target PII fields configured for encryption in gold layer")
-        
-    #     return final_data
+    def read_source_streaming(self) -> DataFrame:
+        """Generic Method for to read raw data for autoloader based streaming paths for bronze tables
+        Returns:
+            dataframe to be persisted to bronze table"""
+        logger.info("In read_source_streaming func")
+        bronze_dataflow_spec: BronzeDataflowSpec = self.dataflowSpec
+        source_path = bronze_dataflow_spec.sourceDetails["path"]
+        reader_config_options = bronze_dataflow_spec.readerConfigOptions
+        if self.schema_json:
+            schema = StructType.fromJson(self.schema_json)
+
+            dataframe = self.spark.readStream.format(bronze_dataflow_spec.sourceFormat) \
+                    .options(**reader_config_options) \
+                    .schema(schema) \
+                    .load(source_path)
+        else:
+            dataframe = self.spark.readStream.format(bronze_dataflow_spec.sourceFormat)\
+                    .options(**reader_config_options)\
+                    .load(source_path)
+        if(bronze_dataflow_spec.flattenNestedData is not None and bronze_dataflow_spec.flattenNestedData == "true") :
+            if isinstance(bronze_dataflow_spec.columnToExtract, list):
+                column_to_extract = bronze_dataflow_spec.columnToExtract[0] if bronze_dataflow_spec.columnToExtract else ""
+            else:
+                column_to_extract = bronze_dataflow_spec.columnToExtract or ""
+            dataframe = DataflowUtils.recurFlattenDF(dataframe, bronze_dataflow_spec.columnToExtract)
+        return dataframe
+
+    def read_source_batch(self) -> DataFrame:
+        """Generic Method for to read raw data for CSV/Parquet/json/delta files for bronze tables
+        Returns:
+            dataframe to be persisted to bronze table"""
+        logger.info("In read_source_batch func")
+        bronze_dataflow_spec: BronzeDataflowSpec = self.dataflowSpec
+        source_path = bronze_dataflow_spec.sourceDetails["path"]
+        reader_config_options = bronze_dataflow_spec.readerConfigOptions
+        if self.schema_json:
+            schema = StructType.fromJson(self.schema_json)
+
+            dataframe = self.spark.read.format(bronze_dataflow_spec.sourceFormat) \
+                    .options(**reader_config_options) \
+                    .schema(schema) \
+                    .load(source_path)
+        else:
+            dataframe = self.spark.read.format(bronze_dataflow_spec.sourceFormat) \
+                    .options(**reader_config_options) \
+                    .load(source_path)
+        if(bronze_dataflow_spec.flattenNestedData is not None and bronze_dataflow_spec.flattenNestedData == "true") :
+            if isinstance(bronze_dataflow_spec.columnToExtract, list):
+                column_to_extract = bronze_dataflow_spec.columnToExtract[0] if bronze_dataflow_spec.columnToExtract else ""
+            else:
+                column_to_extract = bronze_dataflow_spec.columnToExtract or ""
+            dataframe = DataflowUtils.recurFlattenDF(dataframe, column_to_extract)
+        return dataframe
 
     def write_to_delta(self):
         """Write to Delta."""

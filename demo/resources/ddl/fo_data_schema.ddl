@@ -1,0 +1,139 @@
+-- DDL Schema Format
+activityCode BIGINT,
+activityId BIGINT,
+activityTime STRING,
+activityType BIGINT,
+header STRUCT<
+    accountCategory: BIGINT,
+    accountNo: STRING,
+    accountTransactionNo: BIGINT,
+    betline: STRING,
+    crossSellIndicator: BOOLEAN,
+    customerSessionId: BIGINT,
+    dailyFixedOddsInvestment: BIGINT,
+    dataGroupingBizdate: BIGINT,
+    errorText: STRING,
+    frontendNo: BIGINT,
+    fundsAvailableForBetting: BIGINT,
+    isPayoutMayExceedLimit: BOOLEAN,
+    isTrainingAccount: BOOLEAN,
+    logicalTerminalId: BIGINT,
+    msn: BIGINT,
+    previousSellRequestStatus: BIGINT,
+    processingLocation: STRUCT<
+        cbLocation: STRUCT<
+            centreNo: STRING,
+            escNo: STRING,
+            isHoTerminal: STRING,
+            isOnCourse: STRING,
+            isSvt: STRING,
+            minTicketCostAmount: STRING,
+            sourceSystemId: STRING,
+            terminalNo: STRING,
+            windowNo: STRING
+        >,
+        directInputLocation: STRUCT<
+            citNo: BIGINT,
+            citType: BIGINT,
+            pseudoTerminalNo: BIGINT
+        >,
+        processingLocationType: BIGINT,
+        voiceLocation: STRUCT<
+            locationId: STRING,
+            terminalNo: STRING,
+            trackId: STRING
+        >
+    >,
+    resultCode: BIGINT,
+    resultText: STRING,
+    sellRequest: STRUCT<
+        betVar: STRUCT<
+            allUp: STRUCT<
+                allUpLevelNo: BIGINT,
+                formula: STRING
+            >,
+            listLegs: ARRAY<STRUCT<
+                emsSequence: BIGINT,
+                eventId: BIGINT,
+                eventOperationStatus: BIGINT,
+                financialIndex: BIGINT,
+                legOrder: BIGINT,
+                listCombinations: ARRAY<STRUCT<
+                    combinationId: BIGINT,
+                    combinationOrder: BIGINT,
+                    emsSequence: BIGINT,
+                    lineId: BIGINT,
+                    odds: DOUBLE
+                >>,
+                poolId: BIGINT,
+                raceNo: BIGINT,
+                tagEventId: BIGINT
+            >>,
+            noOfBet: BIGINT,
+            totalAmount: BIGINT,
+            unitAmount: BIGINT
+        >,
+        counterOfferType: BIGINT,
+        isFixedOdds: BOOLEAN,
+        listBetInterceptReasons: STRING,
+        listCounterOffers: STRING,
+        parentSellRequestId: BIGINT,
+        sellRequestId: BIGINT,
+        sellRequestStatus: BIGINT,
+        sportId: BIGINT
+    >,
+    sellRequestStatusSnapshot: BIGINT,
+    sourceType: BIGINT,
+    staffNo: STRING,
+    sysOfferCount: BIGINT,
+    systemId: BIGINT,
+    terminalSessionId: BIGINT
+>,
+messageType BIGINT,
+previousTicketStatus BIGINT,
+sourceActivityId BIGINT,
+ticket STRUCT<
+    accountClassId: BIGINT,
+    betVar: STRUCT<
+        allUp: STRUCT<
+            allUpLevelNo: BIGINT
+        >,
+        listLegs: ARRAY<STRUCT<
+            emsSequence: BIGINT,
+            eventId: BIGINT,
+            eventOperationStatus: BIGINT,
+            financialIndex: BIGINT,
+            legOrder: BIGINT,
+            listCombinations: ARRAY<STRUCT<
+                combinationId: BIGINT,
+                combinationOrder: BIGINT,
+                emsSequence: BIGINT,
+                lineId: BIGINT,
+                odds: DOUBLE
+            >>,
+            poolId: BIGINT,
+            raceNo: BIGINT,
+            tagEventId: BIGINT
+        >>,
+        noOfBet: BIGINT,
+        totalAmount: BIGINT,
+        totalPayout: BIGINT,
+        totalRefund: BIGINT,
+        unitAmount: BIGINT
+    >,
+    collationSequence: BIGINT,
+    collationType: BIGINT,
+    counterOfferType: BIGINT,
+    dataGroupingBizdate: BIGINT,
+    isElite: BOOLEAN,
+    isFixedOdds: BOOLEAN,
+    originalTicketId: BIGINT,
+    sellRequestId: BIGINT,
+    sellingDateTime: STRING,
+    sportId: BIGINT,
+    ticketId: BIGINT,
+    ticketStatus: BIGINT,
+    uniqueTicketId: BIGINT
+>,
+ticketStatusSnapshot BIGINT,
+traceabilityId STRING
