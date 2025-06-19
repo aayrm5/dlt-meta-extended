@@ -4,7 +4,6 @@ import json
 from pyspark.sql import DataFrame
 from pyspark.sql.types import StructType, StructField, StringType, BooleanType
 from pyspark.sql.functions import from_json, col, current_timestamp, udf, expr, map_from_entries
-from src.onboard_dataflowspec import OnboardDataflowspec
 from src.dataflow_spec import BronzeDataflowSpec
 from src.dataflow_utils import DataflowUtils
 import pyspark.sql.types as T
@@ -207,13 +206,7 @@ class PipelineReaders:
         if "custom_decode_fo" in kafka_options and kafka_options["custom_decode_fo"] == "true":
             print("----------------in custom decode FO-----------------------")
 
-            if kafka_options["custom_decode_trasaction_type"] == "RAW_FO":
-                print("----------------In RAW_FO-----------------------")
-                raw_df = (raw_df
-                .selectExpr("value as base64EncodedData", "offset as kafkaOffset", "partition as kafkaPartition", "timestamp as kafkaMessageTimestamp", "topic as kafkaTopic", "headers")
-                )
-
-            elif kafka_options["custom_decode_trasaction_type"] == "BET_FO":
+            if kafka_options["custom_decode_trasaction_type"] == "BET_FO":
                 print("----------------In BET_FO-----------------------")
                 raw_df = (raw_df
                     .withColumn("decoded_value",expr("decode(value, 'utf-8')"))
@@ -261,12 +254,6 @@ class PipelineReaders:
 
         elif "custom_decode_pmu" in kafka_options and kafka_options["custom_decode_pmu"] == "true":
             print("----------------in custom decode PMU-----------------------")
-            if kafka_options["custom_decode_trasaction_type"] == "RAW_PMU":
-                print("----------------In RAW_PMU-----------------------")
-                raw_df = (raw_df
-                          .withColumn("headers", expr("transform(headers, x -> struct(x.key, decode(x.value, 'UTF-8') as value))"))
-                          .selectExpr("value as binaryData", "offset as kafkaOffset", "partition as kafkaPartition", "timestamp as kafkaMessageTimestamp", "topic as kafkaTopic", "headers")
-                          )
 
             if kafka_options["custom_decode_trasaction_type"] == "RACE_PMU":
                 print("----------------In RACE_PMU-----------------------")

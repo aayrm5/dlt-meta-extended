@@ -2,7 +2,7 @@
   "data_flow_id": "1",
   "data_flow_group": "hkjc-streaming-dashboard-usecase",
   "source_format": "kafka",
-  "source_details": {
+  "source_details_dev": {
     "kafka.bootstrap.servers": "kafka.confluent.edap.corpdev.hkjc.com:9092",
     "subscribe": "edap-s-ap-fo-activity",
     "kafka.security.protocol": "SSL",
@@ -26,11 +26,9 @@
     "kafka.request.timeout.ms": "60000",
     "kafka.fetch.min.bytes": "1024",
     "kafka.fetch.max.wait.ms": "5000",
-    "kafka.max.partition.fetch.bytes": "1048576",
-    "custom_decode_fo": "true",
-    "custom_decode_trasaction_type": "RAW_FO"
+    "kafka.max.partition.fetch.bytes": "1048576"
   },
-  "bronze": {
+  "bronze_dev": {
     "target_details": {
       "catalog": "edap_dev",
       "schema": "stg_ak",
@@ -95,7 +93,7 @@
   "data_flow_id": "2",
   "data_flow_group": "hkjc-streaming-dashboard-usecase",
   "source_format": "kafka",
-  "source_details": {
+  "source_details_dev": {
     "kafka.bootstrap.servers": "kafka.confluent.edap.corpdev.hkjc.com:9092",
     "subscribe": "edap-s-ap-fo-activity",
     "kafka.security.protocol": "SSL",
@@ -124,7 +122,7 @@
     "custom_decode_fo": "true",
     "custom_decode_trasaction_type": "BET_FO"
   },
-  "bronze": {
+  "bronze_dev": {
     "target_details": {
       "catalog": "edap_dev",
       "schema": "stg_ak",
@@ -188,7 +186,7 @@
   "data_flow_id": "3",
   "data_flow_group": "hkjc-streaming-dashboard-usecase",
   "source_format": "kafka",
-  "source_details": {
+  "source_details_dev": {
     "kafka.bootstrap.servers": "kafka.confluent.edap.corpdev.hkjc.com:9092",
     "subscribe": "edap-s-ap-fo-activity",
     "kafka.security.protocol": "SSL",
@@ -217,7 +215,7 @@
     "custom_decode_fo": "true",
     "custom_decode_trasaction_type": "BET_FO_CANCEL"
   },
-  "bronze": {
+  "bronze_dev": {
     "target_details": {
       "catalog": "edap_dev",
       "schema": "stg_ak",

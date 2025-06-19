@@ -11,6 +11,7 @@ from pyspark.sql.types import ArrayType, MapType, StringType, StructField, Struc
 
 from src.dataflow_spec import BronzeDataflowSpec, DataflowSpecUtils, SilverDataflowSpec, GoldDataflowSpec
 from src.metastore_ops import DeltaPipelinesInternalTableOps, DeltaPipelinesMetaStoreOps
+from src.pipeline_readers import PipelineReaders
 
 logger = logging.getLogger("databricks.labs.dltmeta")
 logger.setLevel(logging.INFO)
@@ -37,6 +38,7 @@ class OnboardDataflowspec:
         self.deltaPipelinesMetaStoreOps = DeltaPipelinesMetaStoreOps(self.spark)
         self.deltaPipelinesInternalTableOps = DeltaPipelinesInternalTableOps(self.spark)
         self.onboard_file_type = None
+        self.dbutils = PipelineReaders.get_db_utils(self)
 
     def _determine_layers_to_onboard(self):
         """
@@ -63,7 +65,7 @@ class OnboardDataflowspec:
         if not layers and 'onboarding_file_path' in self.dict_obj:
             try:
                 # Try to read the onboarding file to determine available layers
-                onboarding_df = self.__get_onboarding_file_dataframe(self.dict_obj['onboarding_file_path'])
+                onboarding_df = self.__get_onboarding_file_dataframe(self.dict_obj['onboarding_file_path'], self.dict_obj['env'])
                 sample_row = onboarding_df.first()
                 
                 # Check for bronze indicators with environment substitution
@@ -71,19 +73,18 @@ class OnboardDataflowspec:
                 if any(col in onboarding_df.columns for col in [f'bronze_{env}', f'source_details_{env}', 'bronze_reader_options']):
                     layers.append('bronze')
                 
-                # Check for silver indicators  
-                if sample_row and any('silver' in col.lower() for col in onboarding_df.columns):
+                # Check for silver indicators with environment substitution
+                if any(col in onboarding_df.columns for col in [f'silver_{env}']):
                     layers.append('silver')
                     
-                # Check for gold indicators
-                if sample_row and any('gold' in col.lower() for col in onboarding_df.columns):
+                # Check for gold indicators with environment substitution
+                if any(col in onboarding_df.columns for col in [f'gold_{env}']):
                     layers.append('gold')
             except Exception as e:
                 logger.warning(f"Could not auto-determine layers from onboarding file: {e}")
-                # Default to bronze if nothing else is specified
-                layers = ['bronze']
-        
-        return layers if layers else ['bronze']  # Default to bronze if nothing detected
+
+        print("----------Riyaz------------" + str(layers))
+        return layers
 
     def __initialize_paths(self, uc_enabled):
         """Initialize paths by removing irrelevant path configurations based on layers to onboard."""
@@ -224,27 +225,37 @@ class OnboardDataflowspec:
             bool: True if data is available for the layer
         """
         try:
-            sample_row = onboarding_df.first()
-            if not sample_row:
-                return False
-                
+            # Get DataFrame columns
+            df_columns = onboarding_df.columns
+            
+            print(f"DEBUG: Validating {layer} layer for environment: {env}")
+            print(f"DEBUG: Available columns: {df_columns}")
+            
+            # Check for required fields based on layer
             if layer == 'bronze':
                 required_fields = ['data_flow_id', 'data_flow_group', f'source_details_{env}', f'bronze_{env}']
-                return all(field in sample_row and sample_row[field] is not None for field in required_fields)
-                
             elif layer == 'silver':
-                required_fields = ['data_flow_id', 'data_flow_group', f'silver_database_{env}', 'silver_table']
-                return all(field in sample_row and sample_row[field] is not None for field in required_fields)
-                
+                required_fields = ['data_flow_id', 'data_flow_group', f'silver_{env}']
             elif layer == 'gold':
-                required_fields = ['data_flow_id', 'data_flow_group', f'gold_database_{env}', 'gold_table']
-                return all(field in sample_row and sample_row[field] is not None for field in required_fields)
-                
+                required_fields = ['data_flow_id', 'data_flow_group', f'gold_{env}']
+            else:
+                return False
+            
+            print(f"DEBUG: Required fields: {required_fields}")
+            
+            # Check if required fields exist in DataFrame columns
+            missing_fields = [field for field in required_fields if field not in df_columns]
+            
+            if missing_fields:
+                print(f"DEBUG: Missing fields: {missing_fields}")
+                return False
+            
+            print(f"DEBUG: All required fields found for {layer} layer")
+            return True
+            
         except Exception as e:
-            logger.warning(f"Could not validate onboarding data for {layer}: {e}")
+            print(f"DEBUG: Error in validation: {e}")
             return False
-        
-        return False
 
     def register_bronze_dataflow_spec_tables(self):
         """Register bronze/silver dataflow specs tables."""
@@ -323,7 +334,7 @@ class OnboardDataflowspec:
             self.__validate_dict_attributes(attributes, dict_obj)
 
         onboarding_df = self.__get_onboarding_file_dataframe(
-            dict_obj["onboarding_file_path"]
+            dict_obj["onboarding_file_path"], self.dict_obj['env']
         )
 
         # Validate that the onboarding data contains bronze information
@@ -391,6 +402,7 @@ class OnboardDataflowspec:
         """
         if 'silver' not in self.layers_to_onboard:
             logger.info("Silver layer not selected for onboarding, skipping...")
+            print("-----------------Exiting onboard silver dataflow Spec as its not present in layers to onboard list---------------------------------")
             return
             
         attributes = [
@@ -410,16 +422,20 @@ class OnboardDataflowspec:
             self.__validate_dict_attributes(attributes, dict_obj)
 
         onboarding_df = self.__get_onboarding_file_dataframe(
-            dict_obj["onboarding_file_path"]
+            dict_obj["onboarding_file_path"], self.dict_obj['env']
         )
         
         # Validate that the onboarding data contains silver information
         if not self._validate_onboarding_data_for_layer(onboarding_df, 'silver', dict_obj["env"]):
+            print("-----------Failed <_validate_onboarding_data_for_layer> in the <onboard_silver_dataflow_spec>---------------")
             raise Exception("Onboarding file does not contain valid silver layer data")
             
         silver_data_flow_spec_df = self.__get_silver_dataflow_spec_dataframe(
             onboarding_df, dict_obj["env"]
         )
+        if silver_data_flow_spec_df:
+            print("----------acquired <silver_dataflow_spec_df> moving forward to onboard silver dataflowspec-----------")
+
         columns = StructType(
             [
                 StructField("select_exp", ArrayType(StringType(), True), True),
@@ -436,19 +452,33 @@ class OnboardDataflowspec:
         silver_transformation_json_df = self.spark.createDataFrame(
             data=emp_rdd, schema=columns
         )
-        silver_transformation_json_file = onboarding_df.select(
-            f"silver_transformation_json_{env}"
-        ).dropDuplicates()
+        # Get transformation JSON paths by accessing the original rows directly
+        onboarding_rows = onboarding_df.collect()
+        transformation_json_paths = set()  # Use set to avoid duplicates
 
-        silver_transformation_json_files = silver_transformation_json_file.collect()
-        for row in silver_transformation_json_files:
-            silver_transformation_json_df = silver_transformation_json_df.union(
-                self.spark.read.option("multiline", "true")
-                .schema(columns)
-                .json(row[f"silver_transformation_json_{env}"])
-            )
+        for onboarding_row in onboarding_rows:
+            try:
+                # Access the silver configuration directly from the row
+                silver_config = onboarding_row[f"silver_{env}"]
+                if silver_config:
+                    transformation_json_path = silver_config[f"silver_transformation_json_{env}"]
+                    if transformation_json_path and transformation_json_path.strip():
+                        transformation_json_paths.add(transformation_json_path)
+            except Exception as e:
+                logger.warning(f"Could not access transformation JSON path for a row: {e}")
+                continue
 
-        logger.info(silver_transformation_json_file)
+        logger.info(f"Found transformation JSON paths: {list(transformation_json_paths)}")
+
+        # Process each unique transformation JSON file
+        for transformation_json_path in transformation_json_paths:
+            try:
+                logger.info(f"Reading transformation JSON from: {transformation_json_path}")
+                transformation_df = self.spark.read.option("multiline", "true").schema(columns).json(transformation_json_path)
+                silver_transformation_json_df = silver_transformation_json_df.union(transformation_df)
+            except Exception as e:
+                logger.error(f"Error reading transformation JSON from {transformation_json_path}: {e}")
+                continue
 
         silver_data_flow_spec_df = silver_transformation_json_df.join(
             silver_data_flow_spec_df,
@@ -487,6 +517,7 @@ class OnboardDataflowspec:
                 silver_dataflow_spec_df.write.mode("overwrite").format("delta").option(
                     "mergeSchema", "true"
                 ).save(dict_obj["silver_dataflowspec_path"])
+            print("--------Silver DataFlowSpecTable overwritten")
         else:
             if self.uc_enabled:
                 original_dataflow_df = self.spark.read.format("delta").table(
@@ -506,6 +537,7 @@ class OnboardDataflowspec:
                 ["dataFlowId"],
                 original_dataflow_df.columns,
             )
+            print("--------Silver DataFlowSpecTable Updated as overwrite is False")
         if not self.uc_enabled:
             self.register_silver_dataflow_spec_tables()
 
@@ -536,7 +568,7 @@ class OnboardDataflowspec:
             self.__validate_dict_attributes(attributes, dict_obj)
 
         onboarding_df = self.__get_onboarding_file_dataframe(
-            dict_obj["onboarding_file_path"]
+            dict_obj["onboarding_file_path"], self.dict_obj['env']
         )
         
         # Validate that the onboarding data contains gold information
@@ -570,15 +602,31 @@ class OnboardDataflowspec:
             data=emp_rdd, schema=columns
         )
         gold_transformation_json_file = onboarding_df.select(
-            f"gold_transformation_json_{env}"
+            f"gold_{env}.gold_transformation_json_{env}"
         ).dropDuplicates()
 
-        gold_transformation_json_files = gold_transformation_json_file.collect()
-        for row in gold_transformation_json_files:
-            gold_transformation_json_df = gold_transformation_json_df.union(
-                # self.spark.read.option("multiline", "true").schema(columns).json(row[f"gold_transformation_json_{env}"])
-                self.__update_goldtransform_schema(row[f"gold_transformation_json_{env}"], columns)
-            )
+        onboarding_rows = onboarding_df.collect()
+        transformation_json_paths = set()
+
+        for onboarding_row in onboarding_rows:
+            try:
+                gold_config = onboarding_row[f"gold_{env}"]
+                if gold_config:
+                    transformation_json_path = gold_config[f"gold_transformation_json_{env}"]
+                    if transformation_json_path and transformation_json_path.strip():
+                        transformation_json_paths.add(transformation_json_path)
+            except Exception as e:
+                logger.warning(f"Could not access gold transformation JSON path for a row: {e}")
+                continue
+
+        for transformation_json_path in transformation_json_paths:
+            try:
+                gold_transformation_json_df = gold_transformation_json_df.union(
+                    self.__update_goldtransform_schema(transformation_json_path, columns)
+                )
+            except Exception as e:
+                logger.error(f"Error reading gold transformation JSON from {transformation_json_path}: {e}")
+                continue
 
         logger.info(gold_transformation_json_file)
 
@@ -591,9 +639,6 @@ class OnboardDataflowspec:
             gold_data_flow_spec_df.drop("target_table")  # .drop("path")
             .drop("target_partition_cols")
         )
-
-        # if(f"source_catalog_{env}" in gold_dataflow_spec_df.select("sources").withColumn("sources",expr("explode(sources)")).select("sources.*").columns) :
-        #     gold_dataflow_spec_df = gold_dataflow_spec_df.withColumn('sources', transform( "sources" , lambda source : source.withField('source_catalog', source[f"source_catalog_{env}"])))
 
         gold_dataflow_spec_df = self.__add_audit_columns(
             gold_dataflow_spec_df,
@@ -653,15 +698,37 @@ class OnboardDataflowspec:
         Returns:
             A DataFrame object that contains the transformed data from the input JSON file.
         """
-        if(path.lower().endswith("yaml") or path.lower().endswith("yml")) :
-            yamlBody = self.spark.read.format("text").option("lineSep","\k").load(path).collect().pop()["value"]
-            rows = self.spark.createDataFrame(data=yaml.safe_load(yamlBody), schema = schema).collect()
-        else :
-            rows = self.spark.read.option("multiline", "true").json(path).collect()
         dict_obj = self.gold_dict_obj
         env = dict_obj["env"]
         data = []
         sourcedata = []
+        
+        columns = StructType([
+                    StructField("dlt_views", ArrayType(
+                        StructType([
+                            StructField("reference_name", StringType(), True),
+                            StructField("sql_condition", StringType(), True)
+                        ])
+                    )),
+                    StructField("sources", ArrayType(
+                        StructType([
+                            StructField("filter_condition", StringType(), True),
+                            StructField("pii_fields", MapType(StringType(), StringType(), True), True),
+                            StructField("reference_name", StringType(), True),
+                            StructField("source_table", StringType(), True),  # Note: not source_table_dev
+                            StructField("is_streaming", StringType(), True)
+                        ])
+                    )),
+                    StructField("target_table", StringType(), True)
+        ]) 
+
+        if(path.lower().endswith("yaml") or path.lower().endswith("yml")) :
+            yamlBody = self.spark.read.format("text").load(path).collect().pop()["value"]
+            rows = self.spark.createDataFrame(data=yaml.safe_load(yamlBody), schema = schema).collect()
+        else :
+            transformation_df = self.spark.read.option("multiline", "true").schema(columns).json(path)
+            rows = transformation_df.collect()
+        
         for row in rows:
             dlt_views=row["dlt_views"]
             target_table=row["target_table"]
@@ -684,13 +751,10 @@ class OnboardDataflowspec:
                         filter_condition = source["filter_condition"]
                     else :
                         filter_condition = ""
-                    filter_condition = source["filter_condition"]
-                    #isDlt = source["isDlt"]
-                    reference_name = source["reference_name"]
-                    #source_path_{env} = source[f"source_path_{env}"]
-                    # source_catalog= source["source_catalog"] if "source_catalog" in source else ""
-                    # Updated to support environment-specific source_table
 
+                    reference_name = source["reference_name"]
+                    
+                    # Updated to support environment-specific source_table
                     if f"source_table_{env}" in source:
                         source_table = source[f"source_table_{env}"]
                     else:
@@ -698,7 +762,7 @@ class OnboardDataflowspec:
                         source_table = source.get("source_table", "")
                         if not source_table:
                             logger.warning(f"No source_table or source_table_{env} found in source: {source}")
-                            
+                    
                     source_is_streaming = source["is_streaming"] if "is_streaming" in source else "false"
                     sourceRow = (
                         filter_condition,
@@ -726,13 +790,14 @@ class OnboardDataflowspec:
         _dict.update(filtered)
         return _dict
 
-    def __get_onboarding_file_dataframe(self, onboarding_file_path):
+    def __get_onboarding_file_dataframe(self, onboarding_file_path, env):
         onboarding_df = None
         if onboarding_file_path.lower().endswith(".json"):
             onboarding_df = self.spark.read.option("multiline", "true").json(
                 onboarding_file_path
             )
-            onboarding_df.show(truncate=False)
+            # onboarding_df.show(truncate=False)
+
             self.onboard_file_type = "json"
             onboarding_df_dupes = (
                 onboarding_df.groupBy("data_flow_id").count().filter("count > 1")
@@ -1167,30 +1232,6 @@ class OnboardDataflowspec:
                 af_list.append(self.__delete_none(append_flow_map))
             append_flows = json.dumps(af_list)
         return append_flows, append_flows_schema
-    
-    # def process_ab_config(self, onboarding_row):
-    # """Process AB Cancel Translator configuration from onboarding row"""
-    # ab_translator_config = {}
-    # ab_validation_rules = {}
-    # ab_message_types = []
-    
-    # # Extract AB configuration if present
-    # if "ab_translator_config" in onboarding_row and onboarding_row["ab_translator_config"]:
-    #     ab_translator_config = self.__delete_none(
-    #         onboarding_row["ab_translator_config"].asDict()
-    #     )
-    
-    # if "ab_validation_rules" in onboarding_row and onboarding_row["ab_validation_rules"]:
-    #     ab_validation_rules = self.__delete_none(
-    #         onboarding_row["ab_validation_rules"].asDict()
-    #     )
-    
-    # if "ab_message_types" in onboarding_row and onboarding_row["ab_message_types"]:
-    #     ab_message_types = onboarding_row["ab_message_types"]
-    #     if isinstance(ab_message_types, str):
-    #         ab_message_types = ab_message_types.split(",")
-    
-    # return ab_translator_config, ab_validation_rules, ab_message_types
 
     def __validate_apply_changes(self, onboarding_row, layer):
         cdc_apply_changes = onboarding_row[f"{layer}"]["cdc_apply_changes"]
@@ -1441,108 +1482,103 @@ class OnboardDataflowspec:
         mandatory_fields = [
             "data_flow_id",
             "data_flow_group",
-            f"silver_database_{env}",
-            "silver_table",
-            f"silver_transformation_json_{env}",
-        ]  # f"silver_table_path_{env}",
+            f"silver_{env}",  # Updated to use consolidated silver configuration
+        ]
 
         for onboarding_row in onboarding_rows:
-            try:
-                self.__validate_mandatory_fields(onboarding_row, mandatory_fields)
-            except ValueError:
-                mandatory_fields.append(f"silver_table_path_{env}")
-                self.__validate_mandatory_fields(onboarding_row, mandatory_fields)
+            self.__validate_mandatory_fields(onboarding_row, mandatory_fields)
+            
             silver_data_flow_spec_id = onboarding_row["data_flow_id"]
             silver_data_flow_spec_group = onboarding_row["data_flow_group"]
             silver_reader_config_options = {}
 
             silver_target_format = "delta"
 
-            bronze_target_details = {
-                "database": onboarding_row["bronze_database_{}".format(env)],
-                "table": onboarding_row["bronze_table"],
-            }
+            # Gather source_details from silver configuration if available
+            if "source_details" in onboarding_row[f"silver_{env}"]:
+                source_details = onboarding_row[f"silver_{env}"]["source_details"]
+                bronze_target_details = {
+                    "database": source_details["catalog"] + "." + source_details["schema"],
+                    "table": source_details["table"],
+                }
+            else:
+                raise Exception(f"No valid bronze source details found for silver layer in row={onboarding_row}")
+
+            # Extract silver target details from silver_{env} configuration
             silver_target_details = {
-                "database": onboarding_row["silver_database_{}".format(env)],
-                "table": onboarding_row["silver_table"],
+                "database": onboarding_row[f"silver_{env}"]["target_details"]["catalog"] + "." + onboarding_row[f"silver_{env}"]["target_details"]["schema"],
+                "table": onboarding_row[f"silver_{env}"]["target_details"]["table"],
             }
 
-            if not self.uc_enabled:
-                bronze_target_details["path"] = onboarding_row[
-                    f"bronze_table_path_{env}"
-                ]
-                silver_target_details["path"] = onboarding_row[
-                    f"silver_table_path_{env}"
-                ]
+            if not self.uc_enabled and "path" in onboarding_row[f"silver_{env}"]["target_details"]:
+                silver_target_details["path"] = onboarding_row[f"silver_{env}"]["target_details"]["path"]
 
             silver_table_properties = {}
             if (
-                "silver_table_properties" in onboarding_row
-                and onboarding_row["silver_table_properties"]
+                "silver_table_properties" in onboarding_row[f"silver_{env}"]
+                and onboarding_row[f"silver_{env}"]["silver_table_properties"]
             ):
                 silver_table_properties = self.__delete_none(
-                    onboarding_row["silver_table_properties"].asDict()
+                    onboarding_row[f"silver_{env}"]["silver_table_properties"].asDict()
                 )
 
-            silver_parition_columns = [""]
+            silver_partition_columns = [""]
             if (
-                "silver_partition_columns" in onboarding_row
-                and onboarding_row["silver_partition_columns"]
+                "partition_columns" in onboarding_row[f"silver_{env}"]
+                and onboarding_row[f"silver_{env}"]["partition_columns"]
             ):
-                # Split if this is a list separated by commas
-                if "," in onboarding_row["silver_partition_columns"]:
-                    silver_parition_columns = onboarding_row["silver_partition_columns"].split(",")
-                else:
-                    silver_parition_columns = [onboarding_row["silver_partition_columns"]]
+                # Handle list or comma-separated string
+                partition_cols = onboarding_row[f"silver_{env}"]["partition_columns"]
+                if isinstance(partition_cols, list):
+                    silver_partition_columns = partition_cols
+                elif isinstance(partition_cols, str) and "," in partition_cols:
+                    silver_partition_columns = partition_cols.split(",")
+                elif isinstance(partition_cols, str):
+                    silver_partition_columns = [partition_cols]
 
-            silver_cluster_by = self.__get_cluster_by_properties(onboarding_row, silver_table_properties,
-                                                                 "silver_cluster_by")
+            silver_cluster_by = self.__get_cluster_by_properties(onboarding_row, f"silver_{env}", silver_table_properties, "cluster_by")
 
             silver_cdc_apply_changes = None
             if (
-                "silver_cdc_apply_changes" in onboarding_row
-                and onboarding_row["silver_cdc_apply_changes"]
+                "cdc_apply_changes" in onboarding_row[f"silver_{env}"]
+                and onboarding_row[f"silver_{env}"]["cdc_apply_changes"]
             ):
-                self.__validate_apply_changes(onboarding_row, "silver")
-                silver_cdc_apply_changes_row = onboarding_row[
-                    "silver_cdc_apply_changes"
-                ]
+                self.__validate_apply_changes(onboarding_row, f"silver_{env}")
+                silver_cdc_apply_changes_row = onboarding_row[f"silver_{env}"]["cdc_apply_changes"]
                 if self.onboard_file_type == "json":
                     silver_cdc_apply_changes = json.dumps(
                         self.__delete_none(silver_cdc_apply_changes_row.asDict())
                     )
+
             data_quality_expectations = None
-            if f"silver_data_quality_expectations_json_{env}" in onboarding_row:
-                silver_data_quality_expectations_json = onboarding_row[
-                    f"silver_data_quality_expectations_json_{env}"
-                ]
+            if f"silver_data_quality_expectations_json_{env}" in onboarding_row[f"silver_{env}"]:
+                silver_data_quality_expectations_json = onboarding_row[f"silver_{env}"][f"silver_data_quality_expectations_json_{env}"]
                 if silver_data_quality_expectations_json:
                     data_quality_expectations = self.__get_data_quality_expecations(
                         silver_data_quality_expectations_json
                     )
+
             append_flows, append_flow_schemas = self.get_append_flows_json(
-                onboarding_row, layer="silver", env=env
+                onboarding_row, f"silver_{env}", env
             )
 
             source_PiiFields = {}
             if (
-                "source_PiiFields" in onboarding_row
-                and onboarding_row["source_PiiFields"]
+                "source_pii_fields" in onboarding_row[f"silver_{env}"]
+                and onboarding_row[f"silver_{env}"]["source_pii_fields"]
             ):
-                print(onboarding_row["source_PiiFields"])
                 source_PiiFields = self.__delete_none(
-                    onboarding_row["source_PiiFields"].asDict()
-                    )
+                    onboarding_row[f"silver_{env}"]["source_pii_fields"].asDict()
+                )
             
             target_PiiFields = {}
             if (
-                "target_PiiFields" in onboarding_row
-                and onboarding_row["target_PiiFields"]
+                "target_pii_fields" in onboarding_row[f"silver_{env}"]
+                and onboarding_row[f"silver_{env}"]["target_pii_fields"]
             ):
-                print(onboarding_row["target_PiiFields"])
                 target_PiiFields = self.__delete_none(
-                    onboarding_row["target_PiiFields"].asDict()
-                    )
+                    onboarding_row[f"silver_{env}"]["target_pii_fields"].asDict()
+                )
 
             silver_row = (
                 silver_data_flow_spec_id,
@@ -1553,7 +1589,7 @@ class OnboardDataflowspec:
                 silver_target_format,
                 silver_target_details,
                 silver_table_properties,
-                silver_parition_columns,
+                silver_partition_columns,
                 silver_cdc_apply_changes,
                 data_quality_expectations,
                 append_flows,
@@ -1571,7 +1607,7 @@ class OnboardDataflowspec:
         return data_flow_spec_rows_df
 
     def __get_gold_dataflow_spec_dataframe(self, onboarding_df, env):
-        """Get gold_dataflow_spec method transform onboarding dataframe to silver dataflowSpec dataframe.
+        """Get gold_dataflow_spec method transform onboarding dataframe to gold dataflowSpec dataframe.
 
         Args:
             onboarding_df ([type]): [description]
@@ -1623,110 +1659,100 @@ class OnboardDataflowspec:
         mandatory_fields = [
             "data_flow_id",
             "data_flow_group",
-            f"gold_database_{env}",
-            "gold_table",
-            f"gold_transformation_json_{env}",
-        ]  # f"gold_table_path_{env}",
+            f"gold_{env}",  # Updated to use consolidated gold configuration
+        ]
 
         for onboarding_row in onboarding_rows:
-            try:
-                self.__validate_mandatory_fields(onboarding_row, mandatory_fields)
-            except ValueError:
-                mandatory_fields.append(f"gold_table_path_{env}")
-                self.__validate_mandatory_fields(onboarding_row, mandatory_fields)
+            self.__validate_mandatory_fields(onboarding_row, mandatory_fields)
+            
             gold_data_flow_spec_id = onboarding_row["data_flow_id"]
             gold_data_flow_spec_group = onboarding_row["data_flow_group"]
-            gold_is_streaming = onboarding_row["is_streaming"]
-            # gold_reader_config_options = {}
+            
+            # Extract is_streaming from gold configuration or default to false
+            gold_is_streaming = "false"
+            if (
+                "is_streaming" in onboarding_row[f"gold_{env}"]
+                and onboarding_row[f"gold_{env}"]["is_streaming"]
+            ):
+                gold_is_streaming = str(onboarding_row[f"gold_{env}"]["is_streaming"]).lower()
 
             gold_target_format = "delta"
 
-            # silver_target_details = {
-            #     "database": onboarding_row["silver_database_{}".format(env)],
-            #     "table": onboarding_row["silver_table"],
-            # }
+            # Extract gold target details from gold_{env} configuration
             gold_target_details = {
-                "database": onboarding_row["gold_database_{}".format(env)],
-                "table": onboarding_row["gold_table"],
+                "database": onboarding_row[f"gold_{env}"]["target_details"]["catalog"] + "." + onboarding_row[f"gold_{env}"]["target_details"]["schema"],
+                "table": onboarding_row[f"gold_{env}"]["target_details"]["table"],
             }
 
-            if not self.uc_enabled:
-                # silver_target_details["path"] = onboarding_row[
-                #     f"silver_table_path_{env}"
-                # ]
-                gold_target_details["path"] = onboarding_row[
-                    f"gold_table_path_{env}"
-                ]
+            if not self.uc_enabled and "path" in onboarding_row[f"gold_{env}"]["target_details"]:
+                gold_target_details["path"] = onboarding_row[f"gold_{env}"]["target_details"]["path"]
 
             gold_table_properties = {}
             if (
-                "gold_table_properties" in onboarding_row
-                and onboarding_row["gold_table_properties"]
+                "gold_table_properties" in onboarding_row[f"gold_{env}"]
+                and onboarding_row[f"gold_{env}"]["gold_table_properties"]
             ):
                 gold_table_properties = self.__delete_none(
-                    onboarding_row["gold_table_properties"].asDict()
+                    onboarding_row[f"gold_{env}"]["gold_table_properties"].asDict()
                 )
 
-            gold_parition_columns = [""]
+            gold_partition_columns = [""]
             if (
-                "gold_partition_columns" in onboarding_row
-                and onboarding_row["gold_partition_columns"]
+                "partition_columns" in onboarding_row[f"gold_{env}"]
+                and onboarding_row[f"gold_{env}"]["partition_columns"]
             ):
-                # Split if this is a list separated by commas
-                if "," in onboarding_row["gold_partition_columns"]:
-                    gold_parition_columns = onboarding_row["gold_partition_columns"].split(",")
-                else:
-                    gold_parition_columns = [onboarding_row["gold_partition_columns"]]
+                # Handle list or comma-separated string
+                partition_cols = onboarding_row[f"gold_{env}"]["partition_columns"]
+                if isinstance(partition_cols, list):
+                    gold_partition_columns = partition_cols
+                elif isinstance(partition_cols, str) and "," in partition_cols:
+                    gold_partition_columns = partition_cols.split(",")
+                elif isinstance(partition_cols, str):
+                    gold_partition_columns = [partition_cols]
 
-            gold_cluster_by = self.__get_cluster_by_properties(onboarding_row, gold_table_properties,
-                                                                 "gold_cluster_by")
+            gold_cluster_by = self.__get_cluster_by_properties(onboarding_row, f"gold_{env}", gold_table_properties, "cluster_by")
 
             gold_cdc_apply_changes = None
             if (
-                "gold_cdc_apply_changes" in onboarding_row
-                and onboarding_row["gold_cdc_apply_changes"]
+                "cdc_apply_changes" in onboarding_row[f"gold_{env}"]
+                and onboarding_row[f"gold_{env}"]["cdc_apply_changes"]
             ):
-                self.__validate_apply_changes(onboarding_row, "gold")
-                gold_cdc_apply_changes_row = onboarding_row[
-                    "gold_cdc_apply_changes"
-                ]
+                self.__validate_apply_changes(onboarding_row, f"gold_{env}")
+                gold_cdc_apply_changes_row = onboarding_row[f"gold_{env}"]["cdc_apply_changes"]
                 if self.onboard_file_type == "json":
                     gold_cdc_apply_changes = json.dumps(
                         self.__delete_none(gold_cdc_apply_changes_row.asDict())
                     )
 
             data_quality_expectations = None
-            if f"gold_data_quality_expectations_json_{env}" in onboarding_row:
-                gold_data_quality_expectations_json = onboarding_row[
-                    f"gold_data_quality_expectations_json_{env}"
-                ]
+            if f"gold_data_quality_expectations_json_{env}" in onboarding_row[f"gold_{env}"]:
+                gold_data_quality_expectations_json = onboarding_row[f"gold_{env}"][f"gold_data_quality_expectations_json_{env}"]
                 if gold_data_quality_expectations_json:
                     data_quality_expectations = self.__get_data_quality_expecations(
                         gold_data_quality_expectations_json
                     )
+
             append_flows, append_flow_schemas = self.get_append_flows_json(
-                onboarding_row, layer="gold", env=env
+                onboarding_row, f"gold_{env}", env
             )
+
             targetPiiFields = {}
             if (
-                "targetPiiFields" in onboarding_row
-                and onboarding_row["targetPiiFields"]
+                "target_pii_fields" in onboarding_row[f"gold_{env}"]
+                and onboarding_row[f"gold_{env}"]["target_pii_fields"]
             ):
-                print(onboarding_row["targetPiiFields"])
                 targetPiiFields = self.__delete_none(
-                    onboarding_row["targetPiiFields"].asDict()
-                    )
+                    onboarding_row[f"gold_{env}"]["target_pii_fields"].asDict()
+                )
 
             gold_row = (
                 gold_data_flow_spec_id,
                 gold_data_flow_spec_group,
                 gold_is_streaming,
-                # silver_target_details,
-                # gold_reader_config_options,
                 gold_target_format,
                 gold_target_details,
                 gold_table_properties,
-                gold_parition_columns,
+                gold_partition_columns,
                 gold_cdc_apply_changes,
                 data_quality_expectations,
                 append_flows,
