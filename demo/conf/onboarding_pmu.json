@@ -64,6 +64,31 @@
       "delta.logRetentionDuration": "interval 90 days"
     }
   },
+  "gold_dev": {
+    "target_details": {
+      "catalog": "edap_dev",
+      "schema": "stg_ak",
+      "table": "mv_customer_segment_snapshot",
+      "path": "/Volumes/dlt_meta_uc/dlt_meta_gold_schema/gold_volume/data/gold/stores/"
+    },
+    "target_pii_fields": {
+    },
+    "partition_columns": [],
+    "cluster_by": [],
+    "is_streaming": "false",
+    "gold_table_properties": {
+      "delta.autoOptimize.optimizeWrite": "true",
+      "delta.autoOptimize.autoCompact": "true",
+      "delta.enableChangeDataFeed": "true",
+      "delta.logRetentionDuration": "interval 60 days",
+      "delta.deletedFileRetentionDuration": "interval 14 days"
+    },
+    "gold_writer_config_options": {
+      "mergeSchema": "true"
+    },
+    "gold_data_quality_expectations_json_dev": "",
+    "gold_transformation_json_dev": "file:/Workspace/Users/damanbansal@hkjccorpdev.onmicrosoft.com/aayrm5-dlt-meta/demo/conf/gold_level1_transformations.json"
+  },
   "flatten_nested_data": "false",
   "column_to_extract": "",
   "version": "2.0",
@@ -154,6 +179,43 @@
     "bronze_quarantine_table_properties": {
       "delta.autoOptimize.optimizeWrite": "true",
       "delta.logRetentionDuration": "interval 90 days"
+    }
+  },
+  "gold_dev": {
+    "target_details": {
+      "catalog": "edap_dev",
+      "schema": "stg_ak",
+      "table": "race_transcation_event_pmu",
+      "path": "/Volumes/dlt_meta_uc/dlt_meta_gold_schema/gold_volume/data/gold/stores/"
+    },
+    "target_pii_fields": {
+    },
+    "partition_columns": [],
+    "cluster_by": [],
+    "is_streaming": "true",
+    "gold_table_properties": {
+      "delta.autoOptimize.optimizeWrite": "true",
+      "delta.autoOptimize.autoCompact": "true",
+      "delta.logRetentionDuration": "interval 365 days",
+      "delta.deletedFileRetentionDuration": "interval 30 days"
+    },
+    "gold_writer_config_options": {
+      "mergeSchema": "true",
+      "overwriteSchema": "false"
+    },
+    "gold_data_quality_expectations_json_dev": "",
+    "gold_transformation_json_dev": "file:/Workspace/Users/damanbansal@hkjccorpdev.onmicrosoft.com/aayrm5-dlt-meta/demo/conf/gold_level1_transformations.json",
+    "cdc_apply_changes": 
+    {
+        "keys": [
+            "selling_date", 
+            "ACCOUNT_NO",
+            "ac_tran_no"
+         ],
+        "sequence_by": "time_stamp",
+        "scd_type": "1",
+        "apply_as_deletes": "",
+        "except_column_list": []
     }
   },
   "flatten_nested_data": "false",

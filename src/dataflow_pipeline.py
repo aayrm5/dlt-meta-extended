@@ -458,7 +458,7 @@ class DataflowPipeline:
 
     def write_to_delta(self):
         """Write to Delta."""
-        return dlt.read(self.view_name)
+        return dlt.read_stream(self.view_name)
     
     def encryptDataset(self, data: DataFrame, piiFields: dict, df_spec=None) -> DataFrame:
         """
@@ -865,6 +865,15 @@ class DataflowPipeline:
             silver_dataflowspec_list = DataflowSpecUtils.get_silver_dataflow_spec(spark)
             DataflowPipeline._launch_dlt_flow(
                 spark, "silver", silver_dataflowspec_list, silver_custom_transform_func
+            )
+        elif "bronze_gold" == layer.lower(): 
+            bronze_dataflowspec_list = DataflowSpecUtils.get_bronze_dataflow_spec(spark)
+            DataflowPipeline._launch_dlt_flow(
+                spark, "bronze", bronze_dataflowspec_list, bronze_custom_transform_func
+            )
+            gold_dataflowspec_list = DataflowSpecUtils.get_gold_dataflow_spec(spark)
+            DataflowPipeline._launch_dlt_flow(
+                spark, "gold", gold_dataflowspec_list, gold_custom_transform_func
             )
         elif "bronze_silver_gold" == layer.lower():  # Add full pipeline support
             bronze_dataflowspec_list = DataflowSpecUtils.get_bronze_dataflow_spec(spark)

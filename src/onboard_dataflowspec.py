@@ -39,6 +39,7 @@ class OnboardDataflowspec:
         self.deltaPipelinesInternalTableOps = DeltaPipelinesInternalTableOps(self.spark)
         self.onboard_file_type = None
         self.dbutils = PipelineReaders.get_db_utils(self)
+        env = self.dict_obj.get("env", "dev")
 
     def _determine_layers_to_onboard(self):
         """
@@ -182,6 +183,25 @@ class OnboardDataflowspec:
         elif layer == 'gold':
             self.__validate_dict_attributes(base_attributes, self.gold_dict_obj)
 
+    def _has_layer_data(self, onboarding_row, layer, env):
+        """
+        Check if a specific row has data for the specified layer.
+        
+        Args:
+            onboarding_row: The row from onboarding dataframe
+            layer (str): Layer name ('bronze', 'silver', 'gold')
+            env (str): Environment name
+            
+        Returns:
+            bool: True if the row has data for the layer
+        """
+        try:
+            layer_key = f"{layer}_{env}"
+            return layer_key in onboarding_row and onboarding_row[layer_key] is not None
+        except Exception as e:
+            logger.warning(f"Error checking layer data for {layer}: {e}")
+            return False
+
     def onboard_dataflow_specs(self):
         """
         Onboard_dataflow_specs method will onboard dataFlowSpecs for the determined layers.
@@ -311,7 +331,7 @@ class OnboardDataflowspec:
     def onboard_bronze_dataflow_spec(self):
         """
         Onboard bronze dataflow spec.
-        Modified to only process if bronze layer is in the layers to onboard.
+        Modified to only process rows that have bronze layer data.
         """
         if 'bronze' not in self.layers_to_onboard:
             logger.info("Bronze layer not selected for onboarding, skipping...")
@@ -337,12 +357,23 @@ class OnboardDataflowspec:
             dict_obj["onboarding_file_path"], self.dict_obj['env']
         )
 
-        # Validate that the onboarding data contains bronze information
-        if not self._validate_onboarding_data_for_layer(onboarding_df, 'bronze', dict_obj["env"]):
-            raise Exception("Onboarding file does not contain valid bronze layer data")
+        # Filter rows to only include those with bronze data
+        bronze_rows = []
+        for row in onboarding_df.collect():
+            if self._has_layer_data(row, 'bronze', dict_obj["env"]):
+                bronze_rows.append(row)
+        
+        if not bronze_rows:
+            logger.warning("No rows found with bronze layer data")
+            return
+
+        logger.info(f"Processing {len(bronze_rows)} rows for bronze layer")
+
+        # Create DataFrame from filtered rows
+        bronze_onboarding_df = self.spark.createDataFrame(bronze_rows, onboarding_df.schema)
 
         bronze_dataflow_spec_df = self.__get_bronze_dataflow_spec_dataframe(
-            onboarding_df, dict_obj["env"]
+            bronze_onboarding_df, dict_obj["env"]
         )
 
         bronze_dataflow_spec_df = self.__add_audit_columns(
@@ -398,7 +429,7 @@ class OnboardDataflowspec:
     def onboard_silver_dataflow_spec(self):
         """
         Onboard silver dataflow spec.
-        Modified to only process if silver layer is in the layers to onboard.
+        Modified to only process rows that have silver layer data.
         """
         if 'silver' not in self.layers_to_onboard:
             logger.info("Silver layer not selected for onboarding, skipping...")
@@ -425,13 +456,24 @@ class OnboardDataflowspec:
             dict_obj["onboarding_file_path"], self.dict_obj['env']
         )
         
-        # Validate that the onboarding data contains silver information
-        if not self._validate_onboarding_data_for_layer(onboarding_df, 'silver', dict_obj["env"]):
-            print("-----------Failed <_validate_onboarding_data_for_layer> in the <onboard_silver_dataflow_spec>---------------")
-            raise Exception("Onboarding file does not contain valid silver layer data")
+        # Filter rows to only include those with silver data
+        silver_rows = []
+        for row in onboarding_df.collect():
+            if self._has_layer_data(row, 'silver', dict_obj["env"]):
+                silver_rows.append(row)
+        
+        if not silver_rows:
+            logger.warning("No rows found with silver layer data, skipping silver onboarding")
+            print("-----------No silver layer data found in onboarding file---------------")
+            return
+
+        logger.info(f"Processing {len(silver_rows)} rows for silver layer")
+
+        # Create DataFrame from filtered rows
+        silver_onboarding_df = self.spark.createDataFrame(silver_rows, onboarding_df.schema)
             
         silver_data_flow_spec_df = self.__get_silver_dataflow_spec_dataframe(
-            onboarding_df, dict_obj["env"]
+            silver_onboarding_df, dict_obj["env"]
         )
         if silver_data_flow_spec_df:
             print("----------acquired <silver_dataflow_spec_df> moving forward to onboard silver dataflowspec-----------")
@@ -452,14 +494,14 @@ class OnboardDataflowspec:
         silver_transformation_json_df = self.spark.createDataFrame(
             data=emp_rdd, schema=columns
         )
-        # Get transformation JSON paths by accessing the original rows directly
-        onboarding_rows = onboarding_df.collect()
+        
+        # Get transformation JSON paths by accessing the filtered rows directly
         transformation_json_paths = set()  # Use set to avoid duplicates
 
-        for onboarding_row in onboarding_rows:
+        for silver_row in silver_rows:
             try:
                 # Access the silver configuration directly from the row
-                silver_config = onboarding_row[f"silver_{env}"]
+                silver_config = silver_row[f"silver_{env}"]
                 if silver_config:
                     transformation_json_path = silver_config[f"silver_transformation_json_{env}"]
                     if transformation_json_path and transformation_json_path.strip():
@@ -545,7 +587,7 @@ class OnboardDataflowspec:
     def onboard_gold_dataflow_spec(self):
         """
         Onboard gold dataflow spec.
-        Modified to only process if gold layer is in the layers to onboard.
+        Modified to only process rows that have gold layer data.
         """
         if 'gold' not in self.layers_to_onboard:
             logger.info("Gold layer not selected for onboarding, skipping...")
@@ -571,13 +613,26 @@ class OnboardDataflowspec:
             dict_obj["onboarding_file_path"], self.dict_obj['env']
         )
         
-        # Validate that the onboarding data contains gold information
-        if not self._validate_onboarding_data_for_layer(onboarding_df, 'gold', dict_obj["env"]):
-            raise Exception("Onboarding file does not contain valid gold layer data")
+        # Filter rows to only include those with gold data
+        gold_rows = []
+        for row in onboarding_df.collect():
+            if self._has_layer_data(row, 'gold', dict_obj["env"]):
+                gold_rows.append(row)
+        
+        if not gold_rows:
+            logger.warning("No rows found with gold layer data, skipping gold onboarding")
+            return
+
+        logger.info(f"Processing {len(gold_rows)} rows for gold layer")
+
+        # Create DataFrame from filtered rows
+        gold_onboarding_df = self.spark.createDataFrame(gold_rows, onboarding_df.schema)
             
         gold_data_flow_spec_df = self.__get_gold_dataflow_spec_dataframe(
-            onboarding_df, dict_obj["env"]
+            gold_onboarding_df, dict_obj["env"]
         )
+        env = dict_obj["env"]
+
         columns = StructType([
             StructField("dlt_views",ArrayType(
                 StructType([StructField("reference_name",StringType(),True),
@@ -588,7 +643,7 @@ class OnboardDataflowspec:
                                                             ,StructField("pii_fields",MapType(StringType(),StringType(),True),True)
                                                             ,StructField("reference_name",StringType(),True)
                                                             # ,StructField("source_catalog",StringType(),True)
-                                                            ,StructField("source_table",StringType(),True)
+                                                            ,StructField(f"source_table_{env}",StringType(),True)
                                                             ,StructField("is_streaming",StringType(),True)
                                                             ])
                                                             )
@@ -597,20 +652,17 @@ class OnboardDataflowspec:
         ])
 
         emp_rdd = []
-        env = dict_obj["env"]
+        
         gold_transformation_json_df = self.spark.createDataFrame(
             data=emp_rdd, schema=columns
         )
-        gold_transformation_json_file = onboarding_df.select(
-            f"gold_{env}.gold_transformation_json_{env}"
-        ).dropDuplicates()
 
-        onboarding_rows = onboarding_df.collect()
+        # Get transformation JSON paths from filtered rows
         transformation_json_paths = set()
 
-        for onboarding_row in onboarding_rows:
+        for gold_row in gold_rows:
             try:
-                gold_config = onboarding_row[f"gold_{env}"]
+                gold_config = gold_row[f"gold_{env}"]
                 if gold_config:
                     transformation_json_path = gold_config[f"gold_transformation_json_{env}"]
                     if transformation_json_path and transformation_json_path.strip():
@@ -627,8 +679,6 @@ class OnboardDataflowspec:
             except Exception as e:
                 logger.error(f"Error reading gold transformation JSON from {transformation_json_path}: {e}")
                 continue
-
-        logger.info(gold_transformation_json_file)
 
         gold_data_flow_spec_df = gold_transformation_json_df.join(
             gold_data_flow_spec_df,
@@ -702,41 +752,24 @@ class OnboardDataflowspec:
         env = dict_obj["env"]
         data = []
         sourcedata = []
-        
-        columns = StructType([
-                    StructField("dlt_views", ArrayType(
-                        StructType([
-                            StructField("reference_name", StringType(), True),
-                            StructField("sql_condition", StringType(), True)
-                        ])
-                    )),
-                    StructField("sources", ArrayType(
-                        StructType([
-                            StructField("filter_condition", StringType(), True),
-                            StructField("pii_fields", MapType(StringType(), StringType(), True), True),
-                            StructField("reference_name", StringType(), True),
-                            StructField("source_table", StringType(), True),  # Note: not source_table_dev
-                            StructField("is_streaming", StringType(), True)
-                        ])
-                    )),
-                    StructField("target_table", StringType(), True)
-        ]) 
 
         if(path.lower().endswith("yaml") or path.lower().endswith("yml")) :
             yamlBody = self.spark.read.format("text").load(path).collect().pop()["value"]
             rows = self.spark.createDataFrame(data=yaml.safe_load(yamlBody), schema = schema).collect()
         else :
-            transformation_df = self.spark.read.option("multiline", "true").schema(columns).json(path)
+            transformation_df = self.spark.read.option("multiline", "true").schema(schema).json(path)
             rows = transformation_df.collect()
-        
+        print("-----------------loaded the gold transformation file--------------------")
         for row in rows:
             dlt_views=row["dlt_views"]
             target_table=row["target_table"]
             pii_fields={}
             sources = row["sources"]
+            print("------------iterating through the sources--------------------")
             for source in sources:
                 if source:
                     pii_fields = {}
+                    print("------------creating the pii fields--------------------")
                     if("pii_fields" in source) :
                         if(type(source["pii_fields"]) is dict):
                             json_pii_fields  = source["pii_fields"]
@@ -747,6 +780,7 @@ class OnboardDataflowspec:
                                 pii_fields[piiField] = json_pii_fields[piiField]
                     else :
                         pii_fields = {}
+                    print("------------filter condition creation-----------------")
                     if("filter_condition" in source) :
                         filter_condition = source["filter_condition"]
                     else :
@@ -755,32 +789,35 @@ class OnboardDataflowspec:
                     reference_name = source["reference_name"]
                     
                     # Updated to support environment-specific source_table
+                    print("-----------source_table creation------------")
                     if f"source_table_{env}" in source:
-                        source_table = source[f"source_table_{env}"]
+                        source_table_env = source[f"source_table_{env}"]
                     else:
-                        # Fallback to legacy source_table field for backward compatibility
-                        source_table = source.get("source_table", "")
-                        if not source_table:
-                            logger.warning(f"No source_table or source_table_{env} found in source: {source}")
+                        logger.warning(f"No source_table_{env} found in source: {source}")
+                        source_table_env = ""
                     
                     source_is_streaming = source["is_streaming"] if "is_streaming" in source else "false"
+                    print("----------accumulating all the source information----------------")
                     sourceRow = (
                         filter_condition,
                         pii_fields,
                         reference_name,
-                        # source_catalog,
-                        source_table,
+                        source_table_env,
                         source_is_streaming
                     )
                     sourcedata.append(sourceRow)
+            print("--------------creating the dataRow-----------------")
             dataRow = (
                 dlt_views,
                 sourcedata,
                 target_table
             )
             data.append(dataRow)
+            print("--------------appending the data to the source data-----------------")
             sourcedata = []
+            print("--------resetting the sourcedata-----------------")
         data_flow_spec_rows_df = self.spark.createDataFrame(data, schema)
+        print("------------created the dataflow_spec_rows for the gold tranformation---------------------------")
         return data_flow_spec_rows_df
 
     def __delete_none(self, _dict):
@@ -1235,8 +1272,20 @@ class OnboardDataflowspec:
 
     def __validate_apply_changes(self, onboarding_row, layer):
         cdc_apply_changes = onboarding_row[f"{layer}"]["cdc_apply_changes"]
+
+        # Check if CDC apply changes is actually intended to be used
+        if not cdc_apply_changes:
+            logger.info(f"CDC apply changes is empty for {layer}, skipping validation")
+            return
+
         json_cdc_apply_changes = self.__delete_none(cdc_apply_changes.asDict())
         logger.info(f"actual mergeInfo={json_cdc_apply_changes}")
+
+        if not json_cdc_apply_changes:
+            logger.info(f"CDC apply changes has no valid values for {layer}, skipping validation")
+            return
+        else:
+            logger.info(f"cdc apply changes is not empty for {layer}, validating")
         payload_keys = json_cdc_apply_changes.keys()
         missing_cdc_payload_keys = set(
             DataflowSpecUtils.cdc_applychanges_api_attributes
@@ -1264,8 +1313,17 @@ class OnboardDataflowspec:
 
     def __validate_apply_changes_from_snapshot(self, onboarding_row, layer):
         apply_changes_from_snapshot = onboarding_row[f"{layer}"]["apply_changes_from_snapshot"]
+        # Check if CDC apply changes is actually intended to be used
+        if not cdc_apply_changes:
+            logger.info(f"CDC apply changes is empty for {layer}, skipping validation")
+            return
         json_apply_changes_from_snapshot = self.__delete_none(apply_changes_from_snapshot.asDict())
         logger.info(f"actual applyChangesFromSnapshot={json_apply_changes_from_snapshot}")
+        if not json_cdc_apply_changes:
+            logger.info(f"CDC apply changes has no valid values for {layer}, skipping validation")
+            return
+        else:
+            logger.info(f"cdc apply changes is not empty for {layer}, validating")
         payload_keys = json_apply_changes_from_snapshot.keys()
         missing_apply_changes_from_snapshot_payload_keys = (
             set(DataflowSpecUtils.apply_changes_from_snapshot_api_attributes).difference(payload_keys)
@@ -1634,7 +1692,8 @@ class OnboardDataflowspec:
             "appendFlows", #check relevance
             "appendFlowsSchemas",
             "clusterBy",
-            "targetPiiFields"
+            "targetPiiFields",
+            "env"
         ]
         data_flow_spec_schema = StructType(
             [
@@ -1650,7 +1709,8 @@ class OnboardDataflowspec:
                 StructField("appendFlows", StringType(), True),
                 StructField("appendFlowsSchemas", MapType(StringType(), StringType(), True), True),
                 StructField("clusterBy", ArrayType(StringType(), True), True),
-                StructField("targetPiiFields",MapType(StringType(), StringType(), True),True,)
+                StructField("targetPiiFields",MapType(StringType(), StringType(), True),True,),
+                StructField("env", StringType(), True)
             ]
         )
         data = []
@@ -1758,7 +1818,8 @@ class OnboardDataflowspec:
                 append_flows,
                 append_flow_schemas,
                 gold_cluster_by,
-                targetPiiFields
+                targetPiiFields,
+                env
             )
             data.append(gold_row)
             logger.info(f"gold_data ==== {data}")

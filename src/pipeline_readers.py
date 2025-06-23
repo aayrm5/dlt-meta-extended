@@ -3,7 +3,7 @@ import logging
 import json
 from pyspark.sql import DataFrame
 from pyspark.sql.types import StructType, StructField, StringType, BooleanType
-from pyspark.sql.functions import from_json, col, current_timestamp, udf, expr, map_from_entries
+from pyspark.sql.functions import from_json, col, current_timestamp, udf, expr, map_from_entries, variant_get, parse_json
 from src.dataflow_spec import BronzeDataflowSpec
 from src.dataflow_utils import DataflowUtils
 import pyspark.sql.types as T
@@ -12,7 +12,7 @@ logger = logging.getLogger('databricks.labs.dltmeta')
 logger.setLevel(logging.INFO)
 
 def create_json_validation_udf(spark):
-    """Create a JSON validation UDF that's self-contained"""
+    """Create a JSON validation UDF"""
     
     # Define the UDF function inline to avoid serialization issues
     def validate_json_with_error(json_str):
@@ -46,11 +46,11 @@ def create_parse_message_udf(spark, is_cancel):
 
     if is_cancel:
         parse_udf_cancel = MessageParser.get_udf(is_cancel=is_cancel)
-        spark.udf.register("parse_message_cancel_udf", parse_udf_cancel)    
+        # spark.udf.register("parse_message_cancel_udf", parse_udf_cancel)    
         return parse_udf_cancel
     else:
         parse_udf = MessageParser.get_udf(is_cancel=is_cancel)
-        spark.udf.register("parse_message_udf", parse_udf)
+        # spark.udf.register("parse_message_udf", parse_udf)
         return parse_udf
 
 
@@ -200,6 +200,7 @@ class PipelineReaders:
                 .readStream
                 .format("kafka")
                 .options(**custom_removed_kafka_options)
+                # .option("mode", "PERMISSIVE")
                 .load()
         )
 
@@ -209,6 +210,7 @@ class PipelineReaders:
             if kafka_options["custom_decode_trasaction_type"] == "BET_FO":
                 print("----------------In BET_FO-----------------------")
                 raw_df = (raw_df
+                    .withColumn("headers", expr("transform(headers, x -> struct(x.key, decode(x.value, 'UTF-8') as value))"))      
                     .withColumn("decoded_value",expr("decode(value, 'utf-8')"))
                     .withColumn("validJson", expr("validate_json_udf(decoded_value)"))
                     .withColumn("jsonValue", from_json(col("decoded_value"),kafka_source_schema ))
@@ -219,15 +221,15 @@ class PipelineReaders:
                     .withColumn("kafkaOffset", col("offset"))
                     .withColumn("is_error", col("validJson.is_error"))
                     .withColumn("error_details", col("validJson.error_details"))
-                    .selectExpr("kafkaOffset","kafkaMessageTimestamp","kafkaTopic","kafkaPartition","headersRefined", "is_error","error_details", "jsonValue.*")
+                    .withColumn("sport_id", variant_get(parse_json(col("decoded_value")), '$.header.sellRequest.sportId','string' ))
+                    .withColumn('activity_type', variant_get(parse_json(col("decoded_value")), '$.activityType','string' ))
+                    .withColumn('ticket_status', variant_get(parse_json(col("decoded_value")), '$.ticket.ticketStatus','string' ))
+                    .filter("decoded_value is not null and trim(decoded_value) != 'empty'")
+                    .filter("headersRefined.ActivityCode = '1'")
+                    .filter("sport_id = 1 and (ticket_status in (2,5) or activity_type in (1,3))")
+                    .selectExpr("kafkaOffset","kafkaMessageTimestamp","kafkaTopic","kafkaPartition","headersRefined", "is_error","error_details", "jsonValue.*","sport_id","activity_type","ticket_status")
                 )
-                if(bronze_dataflow_spec.flattenNestedData is not None and bronze_dataflow_spec.flattenNestedData == "true") :
-                    if isinstance(bronze_dataflow_spec.columnToExtract, list):
-                        column_to_extract = bronze_dataflow_spec.columnToExtract[0] if bronze_dataflow_spec.columnToExtract else ""
-                    else:
-                        column_to_extract = bronze_dataflow_spec.columnToExtract or ""
-                    raw_df = DataflowUtils.recurFlattenDF(raw_df, column_to_extract)
-                raw_df = raw_df.filter("headersRefined.ActivityCode = '1'")
+                raw_df = DataflowUtils.add_extra_record(self, raw_df, "BET_FO")
                 
             elif kafka_options["custom_decode_trasaction_type"] == "BET_FO_CANCEL":
                 print("----------------In BET_FO_CANCEL-----------------------")
@@ -242,15 +244,29 @@ class PipelineReaders:
                     .withColumn("kafkaOffset", col("offset"))
                     .withColumn("is_error", col("validJson.is_error"))
                     .withColumn("error_details", col("validJson.error_details"))
-                    .selectExpr("kafkaOffset","kafkaMessageTimestamp","kafkaTopic","kafkaPartition","headersRefined", "is_error","error_details", "jsonValue.*")
+                    .withColumn("sport_id", variant_get(parse_json(col("decoded_value")), '$.header.sellRequest.sportId','string' ))
+                    .withColumn('activity_type', variant_get(parse_json(col("decoded_value")), '$.activityType','string' ))
+                    .withColumn('ticket_status', variant_get(parse_json(col("decoded_value")), '$.ticket.ticketStatus','string' ))
+                    .filter("decoded_value is not null and trim(decoded_value) != 'empty'")
+                    .filter("headersRefined.ActivityCode = '3'")
+                    .filter("sport_id = 1 and (ticket_status in (2,5) or activity_type in (1,3))")
+                    .selectExpr("kafkaOffset","kafkaMessageTimestamp","kafkaTopic","kafkaPartition","headersRefined", "is_error","error_details", "jsonValue.*","sport_id","activity_type","ticket_status")
                 )
-                if(bronze_dataflow_spec.flattenNestedData is not None and bronze_dataflow_spec.flattenNestedData == "true") :
-                    if isinstance(bronze_dataflow_spec.columnToExtract, list):
-                        column_to_extract = bronze_dataflow_spec.columnToExtract[0] if bronze_dataflow_spec.columnToExtract else ""
-                    else:
-                        column_to_extract = bronze_dataflow_spec.columnToExtract or ""
-                    raw_df = DataflowUtils.recurFlattenDF(raw_df, column_to_extract)
-                raw_df = raw_df.filter("headersRefined.ActivityCode = '3'")
+                raw_df = DataflowUtils.add_extra_record(self, raw_df, "BET_FO_CANCEL")
+
+            # # ADD WATERMARK for FO based on ticket_sellingDateTime column
+            # if 'ticket_sellingDateTime' in raw_df.columns:
+            #     raw_df = raw_df.withWatermark("ticket_sellingDateTime", "10 minutes")
+            #     print("Applied watermark on ticket_sellingDateTime for FO CANCEL")
+            # else:
+            #     print("Warning: ticket_sellingDateTime column not found for FO raw_df - No watermark applied")
+
+            if(bronze_dataflow_spec.flattenNestedData is not None and bronze_dataflow_spec.flattenNestedData == "true") :
+                if isinstance(bronze_dataflow_spec.columnToExtract, list):
+                    column_to_extract = bronze_dataflow_spec.columnToExtract[0] if bronze_dataflow_spec.columnToExtract else ""
+                else:
+                    column_to_extract = bronze_dataflow_spec.columnToExtract or ""
+                raw_df = DataflowUtils.recurFlattenDF(raw_df,column_to_extract)
 
         elif "custom_decode_pmu" in kafka_options and kafka_options["custom_decode_pmu"] == "true":
             print("----------------in custom decode PMU-----------------------")
@@ -264,10 +280,12 @@ class PipelineReaders:
                     .withColumn("kafkaPartition", expr("partition"))
                     .withColumn("kafkaTimeStamp", expr("timestamp"))
                     .withColumn("kafkaTopic", expr("topic"))
+                    .filter("headersRefined.ActivityCode = '6'")
                 )
                 raw_df = raw_df.selectExpr("parse_message_udf(hex(value)) as root", "kafkaTopic", "kafkaPartition", "kafkaOffset", "KafkaTimeStamp")
                 raw_df = raw_df.selectExpr("kafkaOffset", "kafkaTopic", "kafkaPartition", "KafkaTimeStamp", "root.errors.*", "root.headerFields.*", "root.valueFields.*")
-                raw_df = raw_df.filter("headersRefined.ActivityCode = '6'")
+
+                raw_df = DataflowUtils.add_extra_record(self, raw_df, "RACE_PMU")
                 
             elif kafka_options["custom_decode_trasaction_type"] == "RACE_PMU_CANCEL":
                 print("----------------In RACE_PMU_CANCEL-----------------------")
@@ -278,12 +296,20 @@ class PipelineReaders:
                     .withColumn("kafkaPartition", expr("partition"))
                     .withColumn("kafkaTimeStamp", expr("timestamp"))
                     .withColumn("kafkaTopic", expr("topic"))
+                    .filter("headersRefined.ActivityCode = '8'")
                 )
                 raw_df = raw_df.selectExpr("parse_message_cancel_udf(hex(value)) as root", "kafkaTopic", "kafkaPartition", "kafkaOffset", "KafkaTimeStamp")
                 raw_df = raw_df.selectExpr("kafkaOffset", "kafkaTopic", "kafkaPartition", "KafkaTimeStamp", "root.errors.*", "root.headerFields.*", "root.valueFields.*")
-                raw_df = raw_df.filter("headersRefined.ActivityCode = '8'")
+
+                raw_df = DataflowUtils.add_extra_record(self, raw_df, "RACE_PMU_CANCEL")
            
-            
+            # ADD WATERMARK for PMU based on time_stamp column
+            # if 'time_stamp' in raw_df.columns:
+            #     raw_df = raw_df.withWatermark("time_stamp", "10 minutes")
+            #     print("Applied watermark on time_stamp for PMU")
+            # else:
+            #     print("Warning: time_stamp column not found for PMU raw_df - No watermark applied")
+
         if self.writer_config_options["includeIngestionTimeAsColumn"] == "true":
             raw_df = raw_df.withColumn("databricksIngestionTimestamp", current_timestamp())
 

@@ -29,6 +29,7 @@ class GoldDataflowPipeline:
         self.spark = spark
         self.refreshStreamingView = "true"
         self.dataflowSpec = dataflow_spec
+        self.env = getattr(dataflow_spec, 'env', 'dev')
         self.view_name = view_name
         # self.job_arguments = job_arguments
         self.encryptDataset = encryptDataset
@@ -38,7 +39,6 @@ class GoldDataflowPipeline:
         # self.apply_data_standardisation = apply_data_standardisation
         gold_dataflow_spec: GoldDataflowSpec = self.dataflowSpec
         self.table_name = f"{gold_dataflow_spec.targetDetails['table']}"
-        # self.table_path = gold_dataflow_spec.targetDetails["path"]
         if view_name_quarantine:
             self.view_name_quarantine = view_name_quarantine
         cdc_apply_changes = getattr(dataflow_spec, 'cdcApplyChanges', None)
@@ -75,7 +75,7 @@ class GoldDataflowPipeline:
                 catalog=dlt_view["source_catalog"]
             else:
                 catalog=None
-            gold_util = GoldSourceProcessingUtils(self.spark,gold_dataflow_spec, dlt_view["reference_name"], self.table_name, dlt_view["source_table"], dlt_view["filter_condition"], dlt_view["pii_fields"], self.decryptDataset, dlt_view["is_streaming"] if "is_streaming" in dlt_view else "false",catalog)
+            gold_util = GoldSourceProcessingUtils(self.spark,gold_dataflow_spec, dlt_view["reference_name"], self.table_name, dlt_view[f"source_table_{self.env}"], dlt_view["filter_condition"], dlt_view["pii_fields"], self.decryptDataset, dlt_view["is_streaming"] if "is_streaming" in dlt_view else "false",catalog)
             gold_util.register_source()
 
     def read_gold_batch(self):
@@ -90,7 +90,7 @@ class GoldDataflowPipeline:
                 catalog=dlt_view["source_catalog"]
             else:
                 catalog=None
-            gold_util = GoldSourceProcessingUtils(self.spark,gold_dataflow_spec, dlt_view["reference_name"], self.table_name, dlt_view["source_table"], dlt_view["filter_condition"], dlt_view["pii_fields"], self.decryptDataset, "false",catalog)
+            gold_util = GoldSourceProcessingUtils(self.spark,gold_dataflow_spec, dlt_view["reference_name"], self.table_name, dlt_view[f"source_table_{self.env}"], dlt_view["filter_condition"], dlt_view["pii_fields"], self.decryptDataset, "false",catalog)
             gold_util.register_source()
     def get_gold_dlt_views(self):
         """Generic Method to read and process sql transformation configured in transformation part of Silver/Gold layer.
