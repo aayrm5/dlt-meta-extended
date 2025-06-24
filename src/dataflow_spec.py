@@ -110,6 +110,7 @@ class GoldDataflowSpec:
     updatedBy: str
     clusterBy: list
     targetPiiFields: map
+    env: str
 
 @dataclass
 class CDCApplyChanges:

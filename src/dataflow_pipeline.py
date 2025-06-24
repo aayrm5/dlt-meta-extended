@@ -289,7 +289,6 @@ class DataflowPipeline:
             self.dataflowSpec.writerConfigOptions
         )
 
-        # ab_translator = ABCancelTranslatorPipeline(self.spark, bronze_dataflow_spec)
         if bronze_dataflow_spec.sourceFormat == "cloudFiles" and bronze_dataflow_spec.isStreaming == "true":
             input_df = self.read_source_streaming()
 
@@ -302,11 +301,6 @@ class DataflowPipeline:
         elif bronze_dataflow_spec.sourceFormat == "eventhub" or bronze_dataflow_spec.sourceFormat == "kafka":
             input_df = pipeline_reader.read_kafka()
 
-        # elif bronze_dataflow_spec.sourceFormat.lower() in ["ab_binary_messages", "ab_cancel_messages"]:
-        # # Handle AB message formats
-        #     input_df = pipeline_reader.read_ab_binary_messages()  # Assume binary files
-        #     input_df = ab_translator.validate_ab_messages(input_df)
-        #     input_df = ab_translator.translate_ab_messages(input_df)
         else:
             raise Exception(f"{bronze_dataflow_spec.sourceFormat} source format not supported")
         
@@ -432,7 +426,7 @@ class DataflowPipeline:
                 column_to_extract = bronze_dataflow_spec.columnToExtract[0] if bronze_dataflow_spec.columnToExtract else ""
             else:
                 column_to_extract = bronze_dataflow_spec.columnToExtract or ""
-            dataframe = DataflowUtils.recurFlattenDF(dataframe, bronze_dataflow_spec.columnToExtract)
+            dataframe = DataflowUtils.recurFlattenDF(dataframe, column_to_extract)
         return dataframe
 
     def read_source_batch(self) -> DataFrame:
@@ -464,7 +458,7 @@ class DataflowPipeline:
 
     def write_to_delta(self):
         """Write to Delta."""
-        return dlt.read(self.view_name)
+        return dlt.read_stream(self.view_name)
     
     def encryptDataset(self, data: DataFrame, piiFields: dict, df_spec=None) -> DataFrame:
         """
@@ -871,6 +865,15 @@ class DataflowPipeline:
             silver_dataflowspec_list = DataflowSpecUtils.get_silver_dataflow_spec(spark)
             DataflowPipeline._launch_dlt_flow(
                 spark, "silver", silver_dataflowspec_list, silver_custom_transform_func
+            )
+        elif "bronze_gold" == layer.lower(): 
+            bronze_dataflowspec_list = DataflowSpecUtils.get_bronze_dataflow_spec(spark)
+            DataflowPipeline._launch_dlt_flow(
+                spark, "bronze", bronze_dataflowspec_list, bronze_custom_transform_func
+            )
+            gold_dataflowspec_list = DataflowSpecUtils.get_gold_dataflow_spec(spark)
+            DataflowPipeline._launch_dlt_flow(
+                spark, "gold", gold_dataflowspec_list, gold_custom_transform_func
             )
         elif "bronze_silver_gold" == layer.lower():  # Add full pipeline support
             bronze_dataflowspec_list = DataflowSpecUtils.get_bronze_dataflow_spec(spark)
