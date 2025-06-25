@@ -30,8 +30,8 @@
   },
   "bronze_dev": {
     "target_details": {
-      "catalog": "edap_dev",
-      "schema": "stg_ak",
+      "catalog": "edap",
+      "schema": "stg_ap_ak",
       "table": "raw_sb_bet_transactions_fo",
       "path": "/Volumes/dlt_meta_uc/dlt_meta_gold_schema/gold_volume/data/gold/stores/"
     },
@@ -124,8 +124,8 @@
   },
   "bronze_dev": {
     "target_details": {
-      "catalog": "edap_dev",
-      "schema": "stg_ak",
+      "catalog": "edap",
+      "schema": "stg_ap_ak",
       "table": "ab_sb_bet_fo",
       "path": "/Volumes/dlt_meta_uc/dlt_meta_gold_schema/gold_volume/data/gold/stores/"
     },
@@ -150,7 +150,7 @@
       "includeIngestionTimeAsColumn" : "true"
     },
     "bronze_data_quality_expectations_json_dev": "file:/Workspace/Users/damanbansal@hkjccorpdev.onmicrosoft.com/aayrm5-dlt-meta/demo/conf/dqe/hkjc-kafka-bronze/decode_value_valid_json_fo.json",
-    "bronze_database_quarantine_dev": "edap_dev.stg_ak",
+    "bronze_database_quarantine_dev": "edap.rej_ap_ak",
     "bronze_quarantine_table": "ab_sb_bet_fo_reject",
     "bronze_quarantine_table_properties": {
       "delta.autoOptimize.optimizeWrite": "true",
@@ -159,8 +159,8 @@
   },
   "gold_dev": {
     "target_details": {
-      "catalog": "edap_dev",
-      "schema": "stg_ak",
+      "catalog": "edap",
+      "schema": "uc_csii_dna_rt_racing_dashboard_ak",
       "table": "race_transcation_event_fo",
       "path": "/Volumes/dlt_meta_uc/dlt_meta_gold_schema/gold_volume/data/gold/stores/"
     },
@@ -253,8 +253,8 @@
   },
   "bronze_dev": {
     "target_details": {
-      "catalog": "edap_dev",
-      "schema": "stg_ak",
+      "catalog": "edap",
+      "schema": "stg_ap_ak",
       "table": "ab_sb_cancel_fo",
       "path": "/Volumes/dlt_meta_uc/dlt_meta_gold_schema/gold_volume/data/gold/stores/"
     },
@@ -279,7 +279,7 @@
       "includeIngestionTimeAsColumn" : "true"
     },
     "bronze_data_quality_expectations_json_dev": "file:/Workspace/Users/damanbansal@hkjccorpdev.onmicrosoft.com/aayrm5-dlt-meta/demo/conf/dqe/hkjc-kafka-bronze/decode_value_valid_json_fo.json",
-    "bronze_database_quarantine_dev": "edap_dev.stg_ak",
+    "bronze_database_quarantine_dev": "edap.rej_ap_ak",
     "bronze_quarantine_table": "ab_sb_cancel_fo_reject",
     "bronze_quarantine_table_properties": {
       "delta.autoOptimize.optimizeWrite": "true",

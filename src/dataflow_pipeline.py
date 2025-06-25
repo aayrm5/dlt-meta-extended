@@ -37,7 +37,8 @@ class AppendFlowWriter:
         return dlt.read_stream(f"{self.append_flow.name}_view")
 
     def write_flow(self):
-        """Write Append Flow."""
+        """Write Append Flow. 
+        Append Flow's target has to be a 3 level namespace fully qualified target table"""
         if self.append_flow.create_streaming_table:
             dlt.create_streaming_table(
                 name=self.target,
@@ -210,6 +211,9 @@ class DataflowPipeline:
     def write_bronze(self):
         """Write Bronze tables."""
         bronze_dataflow_spec: BronzeDataflowSpec = self.dataflowSpec
+        database_name = bronze_dataflow_spec.targetDetails['database']
+        table_name = bronze_dataflow_spec.targetDetails['table']
+        fully_qualified_table_name =  f"{database_name}.{table_name}"
         if bronze_dataflow_spec.sourceFormat and bronze_dataflow_spec.sourceFormat.lower() == "snapshot":
             if self.next_snapshot_and_version:
                 self.apply_changes_from_snapshot()
@@ -223,12 +227,12 @@ class DataflowPipeline:
             target_path = None if self.uc_enabled else bronze_dataflow_spec.targetDetails["path"]
             dlt.table(
                 self.write_to_delta,
-                name=f"{bronze_dataflow_spec.targetDetails['table']}",
+                name=fully_qualified_table_name,
                 partition_cols=DataflowSpecUtils.get_partition_cols(bronze_dataflow_spec.partitionColumns),
                 cluster_by=DataflowSpecUtils.get_partition_cols(bronze_dataflow_spec.clusterBy),
                 table_properties=bronze_dataflow_spec.tableProperties,
                 path=target_path,
-                comment=f"bronze dlt table{bronze_dataflow_spec.targetDetails['table']}",
+                comment=f"bronze dlt table{fully_qualified_table_name}"
             )
         if bronze_dataflow_spec.appendFlows:
             self.write_append_flows()
@@ -236,18 +240,23 @@ class DataflowPipeline:
     def write_silver(self):
         """Write silver tables."""
         silver_dataflow_spec: SilverDataflowSpec = self.dataflowSpec
+
+        database_name = silver_dataflow_spec.targetDetails['database']
+        table_name = silver_dataflow_spec.targetDetails['table']
+        fully_qualified_table_name =  f"{database_name}.{table_name}"
+
         if silver_dataflow_spec.cdcApplyChanges:
             self.cdc_apply_changes()
         else:
             target_path = None if self.uc_enabled else silver_dataflow_spec.targetDetails["path"]
             dlt.table(
                 self.write_to_delta,
-                name=f"{silver_dataflow_spec.targetDetails['table']}",
+                name=fully_qualified_table_name,
                 partition_cols=DataflowSpecUtils.get_partition_cols(silver_dataflow_spec.partitionColumns),
                 cluster_by=DataflowSpecUtils.get_partition_cols(silver_dataflow_spec.clusterBy),
                 table_properties=silver_dataflow_spec.tableProperties,
                 path=target_path,
-                comment=f"silver dlt table{silver_dataflow_spec.targetDetails['table']}",
+                comment=f"silver dlt table {fully_qualified_table_name}"
             )
         if silver_dataflow_spec.appendFlows:
             self.write_append_flows()
@@ -255,6 +264,11 @@ class DataflowPipeline:
     def write_gold(self):
         """Write gold tables."""
         gold_dataflow_spec: GoldDataflowSpec = self.dataflowSpec
+
+        database_name = gold_dataflow_spec.targetDetails['database']
+        table_name = gold_dataflow_spec.targetDetails['table']
+        fully_qualified_table_name =  f"{database_name}.{table_name}"
+
         cdc_apply_changes = getattr(gold_dataflow_spec, 'cdcApplyChanges', None)
         if cdc_apply_changes:
             self.cdc_apply_changes()
@@ -262,12 +276,12 @@ class DataflowPipeline:
             target_path = None if self.uc_enabled else gold_dataflow_spec.targetDetails["path"]
             dlt.table(
                 self.write_to_delta,
-                name=f"{gold_dataflow_spec.targetDetails['table']}",
+                name=fully_qualified_table_name,
                 partition_cols=DataflowSpecUtils.get_partition_cols(gold_dataflow_spec.partitionColumns),
                 cluster_by=DataflowSpecUtils.get_partition_cols(gold_dataflow_spec.clusterBy),
                 table_properties=gold_dataflow_spec.tableProperties,
                 path=target_path,
-                comment=f"silver dlt table{gold_dataflow_spec.targetDetails['table']}",
+                comment=f"Gold dlt table {fully_qualified_table_name}"
             )
         if gold_dataflow_spec.appendFlows:
             self.write_append_flows()
@@ -582,10 +596,13 @@ class DataflowPipeline:
         return input_df
 
     def apply_changes_from_snapshot(self):
+        database_name = self.dataflowSpec.targetDetails['database']
+        table_name = self.dataflowSpec.targetDetails['table']
+        fully_qualified_table_name =  f"{database_name}.{table_name}"
         target_path = None if self.uc_enabled else self.dataflowSpec.targetDetails["path"]
         self.create_streaming_table(None, target_path)
         dlt.apply_changes_from_snapshot(
-            target=f"{self.dataflowSpec.targetDetails['table']}",
+            target=fully_qualified_table_name,
             source=lambda latest_snapshot_version:
             self.next_snapshot_and_version(latest_snapshot_version,
                                            self.dataflowSpec
@@ -599,6 +616,15 @@ class DataflowPipeline:
     def write_bronze_with_dqe(self):
         """Write Bronze table with data quality expectations."""
         bronzeDataflowSpec: BronzeDataflowSpec = self.dataflowSpec
+
+        database_name = bronzeDataflowSpec.targetDetails['database']
+        table_name = bronzeDataflowSpec.targetDetails['table']
+        fully_qualified_table_name =  f"{database_name}.{table_name}"
+
+        quarantine_database_name = bronzeDataflowSpec.quarantineTargetDetails['database']
+        quarantine_table_name = bronzeDataflowSpec.quarantineTargetDetails['table']
+        quarantine_fully_qualified_table_name = f"{quarantine_database_name}.{quarantine_table_name}"
+
         data_quality_expectations_json = json.loads(bronzeDataflowSpec.dataQualityExpectations)
 
         dlt_table_with_expectation = None
@@ -614,12 +640,12 @@ class DataflowPipeline:
                 dlt_table_with_expectation = dlt.expect_all(expect_all_dict)(
                     dlt.table(
                         self.write_to_delta,
-                        name=f"{bronzeDataflowSpec.targetDetails['table']}",
+                        name=fully_qualified_table_name,
                         table_properties=bronzeDataflowSpec.tableProperties,
                         partition_cols=DataflowSpecUtils.get_partition_cols(bronzeDataflowSpec.partitionColumns),
                         cluster_by=DataflowSpecUtils.get_partition_cols(bronzeDataflowSpec.clusterBy),
                         path=target_path,
-                        comment=f"bronze dlt table{bronzeDataflowSpec.targetDetails['table']}",
+                        comment=f"bronze dlt table {fully_qualified_table_name}"
                     )
                 )
             if expect_all_or_fail_dict:
@@ -627,12 +653,12 @@ class DataflowPipeline:
                     dlt_table_with_expectation = dlt.expect_all_or_fail(expect_all_or_fail_dict)(
                         dlt.table(
                             self.write_to_delta,
-                            name=f"{bronzeDataflowSpec.targetDetails['table']}",
+                            name=fully_qualified_table_name,
                             table_properties=bronzeDataflowSpec.tableProperties,
                             partition_cols=DataflowSpecUtils.get_partition_cols(bronzeDataflowSpec.partitionColumns),
                             cluster_by=DataflowSpecUtils.get_partition_cols(bronzeDataflowSpec.clusterBy),
                             path=target_path,
-                            comment=f"bronze dlt table{bronzeDataflowSpec.targetDetails['table']}",
+                            comment=f"bronze dlt table {fully_qualified_table_name}"
                         )
                     )
                 else:
@@ -643,12 +669,12 @@ class DataflowPipeline:
                     dlt_table_with_expectation = dlt.expect_all_or_drop(expect_all_or_drop_dict)(
                         dlt.table(
                             self.write_to_delta,
-                            name=f"{bronzeDataflowSpec.targetDetails['table']}",
+                            name=fully_qualified_table_name,
                             table_properties=bronzeDataflowSpec.tableProperties,
                             partition_cols=DataflowSpecUtils.get_partition_cols(bronzeDataflowSpec.partitionColumns),
                             cluster_by=DataflowSpecUtils.get_partition_cols(bronzeDataflowSpec.clusterBy),
                             path=target_path,
-                            comment=f"bronze dlt table{bronzeDataflowSpec.targetDetails['table']}",
+                            comment=f"bronze dlt table {fully_qualified_table_name}"
                         )
                     )
                 else:
@@ -674,18 +700,23 @@ class DataflowPipeline:
                 dlt.expect_all_or_drop(expect_or_quarantine_dict)(
                     dlt.table(
                         self.write_to_delta,
-                        name=f"{bronzeDataflowSpec.quarantineTargetDetails['table']}",
+                        name=quarantine_fully_qualified_table_name,
                         table_properties=bronzeDataflowSpec.quarantineTableProperties,
                         partition_cols=q_partition_cols,
                         cluster_by=q_cluster_by,
                         path=target_path,
                         comment=f"""bronze dlt quarantine_path table
-                        {bronzeDataflowSpec.quarantineTargetDetails['table']}""",
+                        {quarantine_fully_qualified_table_name}""",
                     )
                 )
 
     def write_append_flows(self):
         """Creates an append flow for the target specified in the dataflowSpec."""
+
+        database_name = self.dataflowSpec.targetDetails['database']
+        table_name = self.dataflowSpec.targetDetails['table']
+        fully_qualified_table_name =  f"{database_name}.{table_name}"
+
         for append_flow in self.appendFlows:
             struct_schema = None
             if self.schema_json:
@@ -695,8 +726,9 @@ class DataflowPipeline:
                     else self.silver_schema
                 )
             append_flow_writer = AppendFlowWriter(
-                self.spark, append_flow,
-                self.dataflowSpec.targetDetails['table'],
+                self.spark, 
+                append_flow,
+                fully_qualified_table_name,
                 struct_schema,
                 self.dataflowSpec.tableProperties,
                 self.dataflowSpec.partitionColumns,

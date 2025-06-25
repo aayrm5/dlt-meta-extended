@@ -221,14 +221,20 @@ class PipelineReaders:
                     .withColumn("kafkaOffset", col("offset"))
                     .withColumn("is_error", col("validJson.is_error"))
                     .withColumn("error_details", col("validJson.error_details"))
-                    .withColumn("sport_id", variant_get(parse_json(col("decoded_value")), '$.header.sellRequest.sportId','string' ))
+                    .withColumn("sport_id", variant_get(parse_json(col("decoded_value")), '$.ticket.sportId','string' ))
                     .withColumn('activity_type', variant_get(parse_json(col("decoded_value")), '$.activityType','string' ))
                     .withColumn('ticket_status', variant_get(parse_json(col("decoded_value")), '$.ticket.ticketStatus','string' ))
                     .filter("decoded_value is not null and trim(decoded_value) != 'empty'")
-                    .filter("headersRefined.ActivityCode = '1'")
-                    .filter("sport_id = 1 and (ticket_status in (2,5) or activity_type in (1,3))")
+                    .filter("sport_id = 1 and (ticket_status =2 or activity_type =1)")
                     .selectExpr("kafkaOffset","kafkaMessageTimestamp","kafkaTopic","kafkaPartition","headersRefined", "is_error","error_details", "jsonValue.*","sport_id","activity_type","ticket_status")
                 )
+                if(bronze_dataflow_spec.flattenNestedData is not None and bronze_dataflow_spec.flattenNestedData == "true") :
+                    if isinstance(bronze_dataflow_spec.columnToExtract, list):
+                        column_to_extract = bronze_dataflow_spec.columnToExtract[0] if bronze_dataflow_spec.columnToExtract else ""
+                    else:
+                        column_to_extract = bronze_dataflow_spec.columnToExtract or ""
+                    raw_df = DataflowUtils.recurFlattenDF(raw_df,column_to_extract)
+
                 raw_df = DataflowUtils.add_extra_record(self, raw_df, "BET_FO")
                 
             elif kafka_options["custom_decode_trasaction_type"] == "BET_FO_CANCEL":
@@ -244,29 +250,21 @@ class PipelineReaders:
                     .withColumn("kafkaOffset", col("offset"))
                     .withColumn("is_error", col("validJson.is_error"))
                     .withColumn("error_details", col("validJson.error_details"))
-                    .withColumn("sport_id", variant_get(parse_json(col("decoded_value")), '$.header.sellRequest.sportId','string' ))
+                    .withColumn("sport_id", variant_get(parse_json(col("decoded_value")), '$.ticket.sportId','string' ))
                     .withColumn('activity_type', variant_get(parse_json(col("decoded_value")), '$.activityType','string' ))
                     .withColumn('ticket_status', variant_get(parse_json(col("decoded_value")), '$.ticket.ticketStatus','string' ))
                     .filter("decoded_value is not null and trim(decoded_value) != 'empty'")
-                    .filter("headersRefined.ActivityCode = '3'")
-                    .filter("sport_id = 1 and (ticket_status in (2,5) or activity_type in (1,3))")
+                    .filter("sport_id = 1 and (ticket_status =5 or activity_type =3)")
                     .selectExpr("kafkaOffset","kafkaMessageTimestamp","kafkaTopic","kafkaPartition","headersRefined", "is_error","error_details", "jsonValue.*","sport_id","activity_type","ticket_status")
                 )
+                if(bronze_dataflow_spec.flattenNestedData is not None and bronze_dataflow_spec.flattenNestedData == "true") :
+                    if isinstance(bronze_dataflow_spec.columnToExtract, list):
+                        column_to_extract = bronze_dataflow_spec.columnToExtract[0] if bronze_dataflow_spec.columnToExtract else ""
+                    else:
+                        column_to_extract = bronze_dataflow_spec.columnToExtract or ""
+                    raw_df = DataflowUtils.recurFlattenDF(raw_df,column_to_extract)
+
                 raw_df = DataflowUtils.add_extra_record(self, raw_df, "BET_FO_CANCEL")
-
-            # # ADD WATERMARK for FO based on ticket_sellingDateTime column
-            # if 'ticket_sellingDateTime' in raw_df.columns:
-            #     raw_df = raw_df.withWatermark("ticket_sellingDateTime", "10 minutes")
-            #     print("Applied watermark on ticket_sellingDateTime for FO CANCEL")
-            # else:
-            #     print("Warning: ticket_sellingDateTime column not found for FO raw_df - No watermark applied")
-
-            if(bronze_dataflow_spec.flattenNestedData is not None and bronze_dataflow_spec.flattenNestedData == "true") :
-                if isinstance(bronze_dataflow_spec.columnToExtract, list):
-                    column_to_extract = bronze_dataflow_spec.columnToExtract[0] if bronze_dataflow_spec.columnToExtract else ""
-                else:
-                    column_to_extract = bronze_dataflow_spec.columnToExtract or ""
-                raw_df = DataflowUtils.recurFlattenDF(raw_df,column_to_extract)
 
         elif "custom_decode_pmu" in kafka_options and kafka_options["custom_decode_pmu"] == "true":
             print("----------------in custom decode PMU-----------------------")
