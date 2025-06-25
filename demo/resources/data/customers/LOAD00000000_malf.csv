@@ -1,6 +1,0 @@
-dmsTimestamp,id,first_name,last_name,email,address,dob,operation,extra_column
-2025-06-14 10:10:00,1,Emily,Stone,emily.stone@example.com,"123 New Lane, IL",1993-11-15,APPEND,unexpected
-2025-06-14 10:10:00,,John,Doe,john.doe@example.com,"456 Road, TX",1990-10-10,APPEND,
-2025-06-14 10:10:00,3,Jane,Doe,jane.doe@example.com,"789 Street, CA",1991-12-12,UPSERT,
-2025-06-14 10:10:00,4,Alex,Smith,alex.smith@example.com,"321 Ave, NY",1992-01-01,, 
-2025-06-14 10:10:00,5,Bob,Brown,bob.brown@example.com,"555 Blvd, FL",1993-09-09,DELETE,

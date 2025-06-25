@@ -1,1 +1,0 @@
-address string, email string, firstname string, id string, lastname string, operation string, operation_date string
