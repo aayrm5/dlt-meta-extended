@@ -9,7 +9,8 @@ logger.setLevel(logging.INFO)
 
 
 class GoldDataflowPipeline:
-    """This class uses dataflowSpec of Silver/Gold capturing processing logic to launch DLT for Silver/Gold flows
+    """This class uses dataflowSpec of Gold capturing processing logic to launch DLT for Gold flows.
+    Important Note: ***Currently Gold reader and its utilities are implemented here in the GoldDataflowPipeline, the Gold write methods are implemented in the Dataflow_pipeline.py for simplicity.***
     """
     def __init__(self, spark, dataflow_spec, view_name, view_name_quarantine, encryptDataset, decryptDataset):
         """Constructor Method to initialise DataFlowPipeline for Gold Pipe
@@ -27,24 +28,21 @@ class GoldDataflowPipeline:
         Raises:
             ValueError: Generic Error for the pipeline run """
         self.spark = spark
-        self.refreshStreamingView = "true"
         self.dataflowSpec = dataflow_spec
         self.env = getattr(dataflow_spec, 'env', 'dev')
         self.view_name = view_name
         self.encryptDataset = encryptDataset
         self.decryptDataset = decryptDataset
         gold_dataflow_spec: GoldDataflowSpec = self.dataflowSpec
-        self.database_name = gold_dataflow_spec.targetDetails['database']
-        self.table_name = gold_dataflow_spec.targetDetails['table']
+
         if view_name_quarantine:
             self.view_name_quarantine = view_name_quarantine
+
         cdc_apply_changes = getattr(dataflow_spec, 'cdcApplyChanges', None)
         if cdc_apply_changes:
             self.cdcApplyChanges = DataflowSpecUtils.get_cdc_apply_changes(self.dataflowSpec.cdcApplyChanges)
         else:
             self.cdcApplyChanges = None
-        if type(dataflow_spec) == GoldDataflowSpec:
-            self.gold_schema = None
 
     def read(self):
         """Generic Method to read source data for Silver/Gold pipeline run
@@ -105,7 +103,7 @@ class GoldDataflowPipeline:
             encrypt_data = "false"
             if( index == len(gold_dataflow_spec.dlt_views) -1 ) :
                 encrypt_data = "true"
-            view_processing = GoldDltViewUtils(self.spark, self.table_name, viewName, dlt_view["sql_condition"], gold_dataflow_spec.targetPiiFields, encrypt_data, self.encryptDataset, gold_dataflow_spec)
+            view_processing = GoldDltViewUtils(self.spark, viewName, dlt_view["sql_condition"], gold_dataflow_spec.targetPiiFields, encrypt_data, self.encryptDataset, gold_dataflow_spec)
             view_processing.register_dlt_view()
         return viewName
     
@@ -161,7 +159,7 @@ class GoldSourceProcessingUtils:
 
 class GoldDltViewUtils:
     """This class handles all utility methods to manage and read individual transformations in Silver/Gold pipeline run"""
-    def __init__(self, spark,table_name, view_name, sql_condition, pii_fields, encrypt_data, encrypt_function, gold_dataflow_spec):
+    def __init__(self, spark, view_name, sql_condition, pii_fields, encrypt_data, encrypt_function, gold_dataflow_spec):
         print("-----------------GoldDltViewUtils-----------------")
         """Constructor Method to initialise GoldDltViewUtils
         Args:
@@ -175,7 +173,6 @@ class GoldDltViewUtils:
         Raises:
             ValueError: Generic Error for the pipeline run """
         self.spark = spark
-        self.table_name=table_name
         self.view_name= view_name
         self.sql_condition = sql_condition
         self.pii_fields = pii_fields
