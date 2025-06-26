@@ -36,7 +36,6 @@
       "path": "/Volumes/dlt_meta_uc/dlt_meta_gold_schema/gold_volume/data/gold/stores/"
     },
     "target_pii_fields": {
-      "value" : "String"
     },
     "partition_columns": [
     ],
@@ -130,6 +129,7 @@
       "path": "/Volumes/dlt_meta_uc/dlt_meta_gold_schema/gold_volume/data/gold/stores/"
     },
     "target_pii_fields": {
+      "header__accountNo":"string"
     },
     "partition_columns": [
     ],
@@ -165,6 +165,7 @@
       "path": "/Volumes/dlt_meta_uc/dlt_meta_gold_schema/gold_volume/data/gold/stores/"
     },
     "target_pii_fields": {
+      "account_no":"string"
     },
     "partition_columns": [],
     "cluster_by": [],
@@ -259,6 +260,7 @@
       "path": "/Volumes/dlt_meta_uc/dlt_meta_gold_schema/gold_volume/data/gold/stores/"
     },
     "target_pii_fields": {
+      "header__accountNo":"string"
     },
     "partition_columns": [
     ],

@@ -69,23 +69,27 @@ class DataflowPipeline:
     """
 
     def __init__(self, spark, dataflow_spec, view_name, view_name_quarantine=None,
-                 custom_transform_func: Callable = None, next_snapshot_and_version: Callable = None):
+             custom_transform_func: Callable = None, next_snapshot_and_version: Callable = None,
+             encrypt_function_name: str = None, decrypt_function_name: str = None):
         """Initialize Constructor."""
         logger.info(
             f"""dataflowSpec={dataflow_spec} ,
                 view_name={view_name},
-                view_name_quarantine={view_name_quarantine}"""
+                view_name_quarantine={view_name_quarantine},
+                encrypt_function_name={encrypt_function_name},
+                decrypt_function_name={decrypt_function_name}"""
         )
         if isinstance(dataflow_spec, BronzeDataflowSpec) or isinstance(dataflow_spec, SilverDataflowSpec) or isinstance(dataflow_spec, GoldDataflowSpec):
             self.__initialize_dataflow_pipeline(
-                spark, dataflow_spec, view_name, view_name_quarantine, custom_transform_func, next_snapshot_and_version
+                spark, dataflow_spec, view_name, view_name_quarantine, custom_transform_func, 
+                next_snapshot_and_version, encrypt_function_name, decrypt_function_name
             )
         else:
             raise Exception("Dataflow not supported!")
 
     def __initialize_dataflow_pipeline(
         self, spark, dataflow_spec, view_name, view_name_quarantine, custom_transform_func: Callable,
-        next_snapshot_and_version: Callable
+        next_snapshot_and_version: Callable, encrypt_function_name: str = None, decrypt_function_name: str = None
     ):
         """Initialize dataflow pipeline state."""
         self.spark = spark
@@ -131,6 +135,9 @@ class DataflowPipeline:
             self.gold_schema = None
         else:
             self.silver_schema = None
+        
+        self.encrypt_function_name = encrypt_function_name 
+        self.decrypt_function_name = decrypt_function_name 
         
         self.gold_pipeline = GoldDataflowPipeline(spark, dataflow_spec, view_name, view_name_quarantine, self.encryptDataset, self.decryptDataset)
 
@@ -371,8 +378,8 @@ class DataflowPipeline:
         where_clause = silver_dataflow_spec.whereClause
         
         # Get PII field configurations
-        source_pii_fields = getattr(silver_dataflow_spec, 'source_PiiFields', {})
-        target_pii_fields = getattr(silver_dataflow_spec, 'target_PiiFields', {})
+        source_pii_fields = getattr(silver_dataflow_spec, 'sourcePiiFields', {})
+        target_pii_fields = getattr(silver_dataflow_spec, 'targetPiiFields', {})
         
         # Read source data from bronze layer 
         raw_delta_table_stream = self.spark.readStream.table(
@@ -524,8 +531,8 @@ class DataflowPipeline:
                     else:
                         data = data.withColumn(column, expr(f"cast(`{column}` as string)"))
                     
-                    # Apply encryption using centralized function at catalog_dlt_meta.default
-                    data = data.withColumn(column, expr(f"catalog_dlt_meta.default.encryptDatabricks(`{column}`)"))
+                    # Apply encryption using configurable function
+                    data = data.withColumn(column, expr(f"{self.encrypt_function_name}(`{column}`)"))
                     logger.info(f"Encrypted PII field: {column}")
                     
                 except Exception as e:
@@ -533,7 +540,7 @@ class DataflowPipeline:
                     # Continue with other fields
                     continue
         
-        logger.info("PII encryption process completed using catalog_dlt_meta.default")
+        logger.info("PII encryption process completed using {self.encrypt_function_name}")
         return data
 
     def decryptDataset(self, data: DataFrame, piiFields: dict) -> DataFrame:
@@ -573,7 +580,7 @@ class DataflowPipeline:
             if datatype is not None:
                 try:
                     # Apply decryption using centralized function at catalog_dlt_meta.default
-                    data = data.withColumn(column, expr(f"catalog_dlt_meta.default.decryptDatabricks({column})"))
+                    data = data.withColumn(column, expr(f"{self.decrypt_function_name}({column})"))
                     logger.info(f"Decrypted PII field: {column}")
                     
                     # Handle complex data types
@@ -587,7 +594,7 @@ class DataflowPipeline:
                     # Continue with other fields
                     continue
         
-        logger.info("PII decryption process completed using catalog_dlt_meta.default")
+        logger.info("PII decryption process completed using {self.decrypt_function_name}")
         return data
 
     def apply_custom_transform_fun(self, input_df):
@@ -871,60 +878,62 @@ class DataflowPipeline:
                             bronze_custom_transform_func: Callable = None,
                             silver_custom_transform_func: Callable = None,
                             gold_custom_transform_func: Callable = None,
-                            next_snapshot_and_version: Callable = None):
+                            next_snapshot_and_version: Callable = None,
+                            encrypt_function_name: str = None,
+                            decrypt_function_name: str = None):
         """Invoke dlt pipeline will launch dlt with given dataflowspec."""
         dataflowspec_list = None
         if "bronze" == layer.lower():
             dataflowspec_list = DataflowSpecUtils.get_bronze_dataflow_spec(spark)
             DataflowPipeline._launch_dlt_flow(
-                spark, "bronze", dataflowspec_list, bronze_custom_transform_func, next_snapshot_and_version
+                spark, "bronze", dataflowspec_list, bronze_custom_transform_func, next_snapshot_and_version, encrypt_function_name, decrypt_function_name
             )
         elif "silver" == layer.lower():
             dataflowspec_list = DataflowSpecUtils.get_silver_dataflow_spec(spark)
             DataflowPipeline._launch_dlt_flow(
-                spark, "silver", dataflowspec_list, silver_custom_transform_func, next_snapshot_and_version
+                spark, "silver", dataflowspec_list, silver_custom_transform_func, next_snapshot_and_version, encrypt_function_name, decrypt_function_name
             )
         elif "gold" == layer.lower():
             dataflowspec_list = DataflowSpecUtils.get_gold_dataflow_spec(spark)
             DataflowPipeline._launch_dlt_flow(
-                spark, "gold", dataflowspec_list, gold_custom_transform_func, next_snapshot_and_version
+                spark, "gold", dataflowspec_list, gold_custom_transform_func, next_snapshot_and_version, encrypt_function_name, decrypt_function_name
             )
         elif "bronze_silver" == layer.lower():
             bronze_dataflowspec_list = DataflowSpecUtils.get_bronze_dataflow_spec(spark)
             DataflowPipeline._launch_dlt_flow(
-                spark, "bronze", bronze_dataflowspec_list, bronze_custom_transform_func
+                spark, "bronze", bronze_dataflowspec_list, bronze_custom_transform_func, next_snapshot_and_version, encrypt_function_name, decrypt_function_name
             )
             silver_dataflowspec_list = DataflowSpecUtils.get_silver_dataflow_spec(spark)
             DataflowPipeline._launch_dlt_flow(
-                spark, "silver", silver_dataflowspec_list, silver_custom_transform_func
+                spark, "silver", silver_dataflowspec_list, silver_custom_transform_func, next_snapshot_and_version, encrypt_function_name, decrypt_function_name
             )
         elif "bronze_gold" == layer.lower(): 
             bronze_dataflowspec_list = DataflowSpecUtils.get_bronze_dataflow_spec(spark)
             DataflowPipeline._launch_dlt_flow(
-                spark, "bronze", bronze_dataflowspec_list, bronze_custom_transform_func
+                spark, "bronze", bronze_dataflowspec_list, bronze_custom_transform_func, next_snapshot_and_version, encrypt_function_name, decrypt_function_name
             )
             gold_dataflowspec_list = DataflowSpecUtils.get_gold_dataflow_spec(spark)
             DataflowPipeline._launch_dlt_flow(
-                spark, "gold", gold_dataflowspec_list, gold_custom_transform_func
+                spark, "gold", gold_dataflowspec_list, gold_custom_transform_func, next_snapshot_and_version, encrypt_function_name, decrypt_function_name
             )
         elif "bronze_silver_gold" == layer.lower():  # Add full pipeline support
             bronze_dataflowspec_list = DataflowSpecUtils.get_bronze_dataflow_spec(spark)
             DataflowPipeline._launch_dlt_flow(
-                spark, "bronze", bronze_dataflowspec_list, bronze_custom_transform_func
+                spark, "bronze", bronze_dataflowspec_list, bronze_custom_transform_func, next_snapshot_and_version, encrypt_function_name, decrypt_function_name
             )
             silver_dataflowspec_list = DataflowSpecUtils.get_silver_dataflow_spec(spark)
             DataflowPipeline._launch_dlt_flow(
-                spark, "silver", silver_dataflowspec_list, silver_custom_transform_func
+                spark, "silver", silver_dataflowspec_list, silver_custom_transform_func, next_snapshot_and_version, encrypt_function_name, decrypt_function_name
             )
             gold_dataflowspec_list = DataflowSpecUtils.get_gold_dataflow_spec(spark)
             DataflowPipeline._launch_dlt_flow(
-                spark, "gold", gold_dataflowspec_list, gold_custom_transform_func
+                spark, "gold", gold_dataflowspec_list, gold_custom_transform_func, next_snapshot_and_version, encrypt_function_name, decrypt_function_name
             )
         
 
     @staticmethod
     def _launch_dlt_flow(
-        spark, layer, dataflowspec_list, custom_transform_func=None, next_snapshot_and_version: Callable = None
+        spark, layer, dataflowspec_list, custom_transform_func=None, next_snapshot_and_version: Callable = None, encrypt_function_name: str = None, decrypt_function_name: str = None
     ):
         for dataflowSpec in dataflowspec_list:
             logger.info("Printing Dataflow Spec")
@@ -944,6 +953,8 @@ class DataflowPipeline:
                 f"{dataflowSpec.targetDetails['table']}_{layer}_inputView",
                 quarantine_input_view_name,
                 custom_transform_func,
-                next_snapshot_and_version
+                next_snapshot_and_version,
+                encrypt_function_name,
+                decrypt_function_name
             )
             dlt_data_flow.run_dlt()
