@@ -1,0 +1,1 @@
+STRUCT<body: STRUCT<entyGrps: ARRAY<STRUCT<entys: ARRAY<STRUCT<crtAt: STRING, crtBy: STRING, id: STRING, mtgDate: STRING, mtgId: STRING, pdtId: STRING, prvStatus: STRING, raceId: STRING, raceSeq: BIGINT, status: STRING, updAt: STRING, updBy: STRING>>>>>>

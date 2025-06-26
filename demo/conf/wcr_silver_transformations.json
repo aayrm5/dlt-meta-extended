@@ -1,0 +1,25 @@
+[
+  {
+    "target_table": "fact_wagering_pmu_product_offer_stream",
+    "select_exp": [
+      "product_offer_id",
+      "product_offer_status",
+      "product_offer_previous_status",
+      "meeting_id",
+      "meeting_date",
+      "race_id",
+      "race_sequence",
+      "product_id",
+      "created_at",
+      "created_by",
+      "updated_at",
+      "updated_by",
+      "kfk_operation_datetime",
+      "etl_created_datetime",
+      "etl_last_update_datetime",
+      "etl_remark"
+    ],
+    "target_partition_cols": "",
+    "where_clause":""
+  }
+]

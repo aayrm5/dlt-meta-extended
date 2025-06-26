@@ -78,8 +78,8 @@ class SilverDataflowSpec:
     updateDate: datetime
     updatedBy: str
     clusterBy: list
-    source_PiiFields: map
-    target_PiiFields: map
+    sourcePiiFields: map
+    targetPiiFields: map
 
 
 @dataclass

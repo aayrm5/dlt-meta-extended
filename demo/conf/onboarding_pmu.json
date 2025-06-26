@@ -36,7 +36,6 @@
       "path": "/Volumes/dlt_meta_uc/dlt_meta_gold_schema/gold_volume/data/gold/stores/"
     },
     "target_pii_fields": {
-      "value" : "String"
     },
     "partition_columns": [
     ],
@@ -129,6 +128,7 @@
       "path": "/Volumes/dlt_meta_uc/dlt_meta_gold_schema/gold_volume/data/gold/stores/"
     },
     "target_pii_fields": {
+      "acct_no":"int"
     },
     "partition_columns": [
     ],
@@ -164,6 +164,7 @@
       "path": "/Volumes/dlt_meta_uc/dlt_meta_gold_schema/gold_volume/data/gold/stores/"
     },
     "target_pii_fields": {
+      "account_no":"int"
     },
     "partition_columns": [],
     "cluster_by": [],
@@ -184,7 +185,7 @@
     {
         "keys": [
             "selling_date", 
-            "ACCOUNT_NO",
+            "account_no",
             "ac_tran_no"
          ],
         "sequence_by": "time_stamp",
@@ -258,6 +259,7 @@
       "path": "/Volumes/dlt_meta_uc/dlt_meta_gold_schema/gold_volume/data/gold/stores/"
     },
     "target_pii_fields": {
+      "acct_no":"int"
     },
     "partition_columns": [
     ],

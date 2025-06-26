@@ -1,0 +1,227 @@
+[
+  {
+    "data_flow_id": "ppl1",
+    "data_flow_group": "hkjc-streaming-dashboard-usecase",
+    "source_format": "kafka",
+    "source_details_dev": {
+      "kafka.bootstrap.servers": "kafka.confluent.edap.corpdev.hkjc.com:9092",
+      "subscribe": "edap-s-wcr-rwem-wager",
+      "kafka.security.protocol": "SSL",
+      "kafka.ssl.endpoint.identification.algorithm": "",
+      "kafka.ssl.truststore.location": "/Volumes/edap/default/certificates/truststore/kafka_truststore.jks",
+      "kafka.ssl.keystore.location": "/Volumes/edap/default/certificates/keystore/kafka_keystore.jks",
+      "kafka.ssl.truststore.secrets.scope": "akv-secrets-etl",
+      "kafka.ssl.truststore.secrets.key": "capemm-truststore-pwd",
+      "kafka.ssl.keystore.secrets.scope": "akv-secrets-etl",
+      "kafka.ssl.keystore.secrets.key": "capemm-keystore-pwd",
+      "maxOffsetsPerTrigger": "10000",
+      "kafka.session.timeout.ms": "30000",
+      "kafka.request.timeout.ms": "60000",
+      "startingOffsets": "earliest"
+    },
+    "bronze_reader_options": {
+      "includeHeaders": "true",
+      "startingOffsets": "earliest",
+      "maxOffsetsPerTrigger": "10000",
+      "minPartitions": "3",
+      "failOnDataLoss": "true",
+      "kafka.session.timeout.ms": "30000",
+      "kafka.request.timeout.ms": "60000",
+      "kafka.fetch.min.bytes": "1024",
+      "kafka.fetch.max.wait.ms": "5000",
+      "kafka.max.partition.fetch.bytes": "1048576"
+    },
+    "bronze_dev": {
+      "target_details": {
+        "catalog": "edap",
+        "schema": "stg_wcr_ak",
+        "table": "wcr_wagering_product_offer",
+        "path": "/Volumes/dlt_meta_uc/dlt_meta_bronze_schema/bronze_volume/data/bronze/wcr/"
+      },
+      "target_pii_fields": {
+      },
+      "partition_columns": [],
+      "cluster_by": [],
+      "is_partitioned_by_run_date": "false",
+      "is_streaming": "true",
+      "bronze_table_properties": {
+        "quality": "bronze",
+        "pipelines.autoOptimize.managed": "true",
+        "failOnDataLoss": "true",
+        "delta.autoOptimize.optimizeWrite": "true",
+        "delta.autoOptimize.autoCompact": "true",
+        "delta.enableChangeDataFeed": "true",
+        "delta.logRetentionDuration": "interval 30 days",
+        "delta.deletedFileRetentionDuration": "interval 7 days",
+        "delta.tuneFileSizesForRewrites": "true"
+      },
+      "bronze_writer_config_options": {
+        "mergeSchema": "true",
+        "includeIngestionTimeAsColumn": "true"
+      },
+      "bronze_data_quality_expectations_json_dev": "",
+      "bronze_database_quarantine_dev": "",
+      "bronze_quarantine_table": "",
+      "bronze_quarantine_table_properties": {
+        "delta.autoOptimize.optimizeWrite": "true",
+        "delta.logRetentionDuration": "interval 90 days"
+      }
+    },
+    "flatten_nested_data": "false",
+    "column_to_extract": "",
+    "version": "2.0",
+    "description": "Raw Kafka ingestion for WCR wagering product offer messages from edap-s-wcr-rwem-wager topic",
+    "metadata": {
+      "created_by": "data-engineering-team",
+      "created_date": "2025-01-15",
+      "last_modified": "2025-01-15",
+      "business_owner": "wagering-operations-team",
+      "data_classification": "internal",
+      "retention_policy": "7_years",
+      "compliance_requirements": [
+        "SOX",
+        "Internal_Audit"
+      ],
+      "tags": [
+        "wcr-data",
+        "wagering",
+        "product-offers",
+        "kafka-streaming",
+        "unity-catalog"
+      ]
+    }
+  },
+  {
+    "data_flow_id": "ppl2",
+    "data_flow_group": "hkjc-streaming-dashboard-usecase",
+    "source_format": "kafka",
+    "source_details_dev": {
+      "kafka.bootstrap.servers": "kafka.confluent.edap.corpdev.hkjc.com:9092",
+      "subscribe": "edap-s-wcr-rwem-wager",
+      "kafka.security.protocol": "SSL",
+      "kafka.ssl.endpoint.identification.algorithm": "",
+      "kafka.ssl.truststore.location": "/Volumes/edap/default/certificates/truststore/kafka_truststore.jks",
+      "kafka.ssl.keystore.location": "/Volumes/edap/default/certificates/keystore/kafka_keystore.jks",
+      "kafka.ssl.truststore.secrets.scope": "akv-secrets-etl",
+      "kafka.ssl.truststore.secrets.key": "capemm-truststore-pwd",
+      "kafka.ssl.keystore.secrets.scope": "akv-secrets-etl",
+      "kafka.ssl.keystore.secrets.key": "capemm-keystore-pwd",
+      "maxOffsetsPerTrigger": "10000",
+      "kafka.session.timeout.ms": "30000",
+      "kafka.request.timeout.ms": "60000",
+      "startingOffsets": "earliest",
+      "source_schema_path": "file:/Workspace/Users/damanbansal@hkjccorpdev.onmicrosoft.com/aayrm5-dlt-meta/demo/resources/ddl/fact_wagering_pmu_product_offer_stream.ddl"
+    },
+    "bronze_reader_options": {
+      "includeHeaders": "true",
+      "startingOffsets": "earliest",
+      "maxOffsetsPerTrigger": "10000",
+      "minPartitions": "3",
+      "failOnDataLoss": "true",
+      "kafka.session.timeout.ms": "30000",
+      "kafka.request.timeout.ms": "60000",
+      "kafka.fetch.min.bytes": "1024",
+      "kafka.fetch.max.wait.ms": "5000",
+      "kafka.max.partition.fetch.bytes": "1048576",
+      "custom_decode_wcr": "true"
+    },
+    "bronze_dev": {
+      "target_details": {
+        "catalog": "edap",
+        "schema": "stg_wcr_ak",
+        "table": "wcr_wagering_product_offer_parsed",
+        "path": ""
+      },
+      "target_pii_fields": {},
+      "partition_columns": [],
+      "cluster_by": [],
+      "is_partitioned_by_run_date": "false",
+      "is_streaming": "true",
+      "bronze_table_properties": {
+        "quality": "bronze",
+        "pipelines.autoOptimize.managed": "true",
+        "delta.autoOptimize.optimizeWrite": "true",
+        "delta.autoOptimize.autoCompact": "true",
+        "delta.enableChangeDataFeed": "true",
+        "delta.logRetentionDuration": "interval 30 days",
+        "delta.deletedFileRetentionDuration": "interval 7 days",
+        "delta.tuneFileSizesForRewrites": "true"
+      },
+      "bronze_writer_config_options": {
+        "mergeSchema": "true",
+        "includeIngestionTimeAsColumn": "true"
+      },
+      "bronze_data_quality_expectations_json_dev": "file:/Workspace/Users/damanbansal@hkjccorpdev.onmicrosoft.com/aayrm5-dlt-meta/demo/conf/dqe/hkjc-kafka-bronze/wcr_bronze_dq_expectations.json",
+      "bronze_database_quarantine_dev": "edap.spd_wagering_ak",
+      "bronze_quarantine_table": "kafka_wcr_reject",
+      "bronze_quarantine_table_properties": {
+        "quality": "bronze",
+        "pipelines.autoOptimize.managed": "true",
+        "delta.autoOptimize.optimizeWrite": "true",
+        "delta.logRetentionDuration": "interval 90 days"
+      }
+    },
+    "silver_dev": {
+      "target_details": {
+        "catalog": "edap",
+        "schema": "spd_wagering_ak",
+        "table": "fact_wagering_pmu_product_offer_stream",
+        "path": "/Volumes/dlt_meta_uc/dlt_meta_silver_schema/silver_volume/data/silver/wcr/"
+      },
+      "source_pii_fields": {},
+      "target_pii_fields": {},
+      "partition_columns": [],
+      "cluster_by": [],
+      "is_streaming": "true",
+      "silver_table_properties": {
+        "quality": "silver",
+        "pipelines.autoOptimize.managed": "true",
+        "delta.autoOptimize.optimizeWrite": "true",
+        "delta.autoOptimize.autoCompact": "true",
+        "delta.enableChangeDataFeed": "true",
+        "delta.logRetentionDuration": "interval 365 days",
+        "delta.deletedFileRetentionDuration": "interval 30 days"
+      },
+      "silver_writer_config_options": {
+        "mergeSchema": "true",
+        "overwriteSchema": "false"
+      },
+      "silver_data_quality_expectations_json_dev": "",
+      "silver_transformation_json_dev": "file:/Workspace/Users/damanbansal@hkjccorpdev.onmicrosoft.com/aayrm5-dlt-meta/demo/conf/wcr_silver_transformations.json",
+      "cdc_apply_changes": {
+        "keys": [
+          "product_offer_id"
+        ],
+        "sequence_by": "struct(updated_at, kfk_operation_datetime, etl_last_update_datetime)",
+        "scd_type": "1",
+        "apply_as_deletes": "",
+        "except_column_list": []
+      }
+    },
+    "flatten_nested_data": "false",
+    "column_to_extract": "",
+    "version": "2.0",
+    "description": "WCR wagering product offer pipeline with complex nested JSON parsing, data quality validation, and SCD Type 1 silver layer processing",
+    "metadata": {
+      "created_by": "data-engineering-team",
+      "created_date": "2025-01-15",
+      "last_modified": "2025-01-15",
+      "business_owner": "wagering-operations-team",
+      "data_classification": "internal",
+      "retention_policy": "7_years",
+      "compliance_requirements": [
+        "SOX",
+        "Internal_Audit"
+      ],
+      "tags": [
+        "wcr-data",
+        "wagering",
+        "product-offers",
+        "kafka-streaming",
+        "nested-json",
+        "scd-type-1",
+        "unity-catalog"
+      ]
+    }
+  }
+]

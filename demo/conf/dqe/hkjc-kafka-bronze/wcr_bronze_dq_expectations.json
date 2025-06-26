@@ -1,0 +1,8 @@
+{
+  "expect_or_drop": {
+    "primary_key_not_null": "product_offer_id is not null"
+  },
+  "expect_or_quarantine": {
+    "null_check": "product_offer_id is null and product_offer_status is null and meeting_id is null and meeting_date is null and race_id is null and race_sequence is null and product_id is null and created_at is null and created_by is null"
+  }
+}

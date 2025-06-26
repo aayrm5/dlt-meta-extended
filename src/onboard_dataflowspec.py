@@ -11,7 +11,6 @@ from pyspark.sql.types import ArrayType, MapType, StringType, StructField, Struc
 
 from src.dataflow_spec import BronzeDataflowSpec, DataflowSpecUtils, SilverDataflowSpec, GoldDataflowSpec
 from src.metastore_ops import DeltaPipelinesInternalTableOps, DeltaPipelinesMetaStoreOps
-from src.pipeline_readers import PipelineReaders
 
 logger = logging.getLogger("databricks.labs.dltmeta")
 logger.setLevel(logging.INFO)
@@ -38,7 +37,6 @@ class OnboardDataflowspec:
         self.deltaPipelinesMetaStoreOps = DeltaPipelinesMetaStoreOps(self.spark)
         self.deltaPipelinesInternalTableOps = DeltaPipelinesInternalTableOps(self.spark)
         self.onboard_file_type = None
-        self.dbutils = PipelineReaders.get_db_utils(self)
         env = self.dict_obj.get("env", "dev")
 
     def _determine_layers_to_onboard(self):
@@ -480,11 +478,11 @@ class OnboardDataflowspec:
 
         columns = StructType(
             [
+                StructField("target_table", StringType(), True),
                 StructField("select_exp", ArrayType(StringType(), True), True),
                 StructField(
                     "target_partition_cols", ArrayType(StringType(), True), True
                 ),
-                StructField("target_table", StringType(), True),
                 StructField("where_clause", ArrayType(StringType(), True), True),
             ]
         )
@@ -494,7 +492,7 @@ class OnboardDataflowspec:
         silver_transformation_json_df = self.spark.createDataFrame(
             data=emp_rdd, schema=columns
         )
-        
+        print("--------------created silver_transformation_json_df--------------------------")
         # Get transformation JSON paths by accessing the filtered rows directly
         transformation_json_paths = set()  # Use set to avoid duplicates
 
@@ -511,9 +509,11 @@ class OnboardDataflowspec:
                 continue
 
         logger.info(f"Found transformation JSON paths: {list(transformation_json_paths)}")
+        print(f"-----transformation_json_paths: {list(transformation_json_paths)} -------------------")
 
         # Process each unique transformation JSON file
         for transformation_json_path in transformation_json_paths:
+            print("-------------iterating through transformation jsons paths---------------------")
             try:
                 logger.info(f"Reading transformation JSON from: {transformation_json_path}")
                 transformation_df = self.spark.read.option("multiline", "true").schema(columns).json(transformation_json_path)
@@ -522,18 +522,20 @@ class OnboardDataflowspec:
                 logger.error(f"Error reading transformation JSON from {transformation_json_path}: {e}")
                 continue
 
+        print("-----out of transformation json paths, joining silver_data_flow_spec df--------")
         silver_data_flow_spec_df = silver_transformation_json_df.join(
             silver_data_flow_spec_df,
             silver_transformation_json_df.target_table
             == silver_data_flow_spec_df.targetDetails["table"],
         )
+        print("----going to add select_exp & where_clause-------")
         silver_dataflow_spec_df = (
             silver_data_flow_spec_df.drop("target_table")  # .drop("path")
             .drop("target_partition_cols")
             .withColumnRenamed("select_exp", "selectExp")
             .withColumnRenamed("where_clause", "whereClause")
         )
-
+        print("----adding audit columns-------")
         silver_dataflow_spec_df = self.__add_audit_columns(
             silver_dataflow_spec_df,
             {
@@ -544,6 +546,9 @@ class OnboardDataflowspec:
 
         silver_fields = [field.name for field in dataclasses.fields(SilverDataflowSpec)]
         silver_dataflow_spec_df = silver_dataflow_spec_df.select(silver_fields)
+        print("----silver_dataflow_spec_df created------- Fields: ", silver_dataflow_spec_df.printSchema())
+
+        print("----writing silver_dataflow_spec_df to table or path-------")
         database = dict_obj["database"]
         table = dict_obj["silver_dataflowspec_table"]
 
@@ -565,6 +570,7 @@ class OnboardDataflowspec:
                 original_dataflow_df = self.spark.read.format("delta").table(
                     f"{database}.{table}"
                 )
+                print(original_dataflow_df.printSchema())
             else:
                 self.deltaPipelinesMetaStoreOps.register_table_in_metastore(
                     database, table, dict_obj["silver_dataflowspec_path"]
@@ -572,7 +578,9 @@ class OnboardDataflowspec:
                 original_dataflow_df = self.spark.read.format("delta").load(
                     dict_obj["silver_dataflowspec_path"]
                 )
+                print(original_dataflow_df.printSchema())
             logger.info("In Merge block for Silver")
+            print("In Merge block for silver")
             self.deltaPipelinesInternalTableOps.merge(
                 silver_dataflow_spec_df,
                 f"{database}.{table}",
@@ -1501,8 +1509,8 @@ class OnboardDataflowspec:
             "appendFlows",
             "appendFlowsSchemas",
             "clusterBy",
-            "source_PiiFields",
-            "target_PiiFields"
+            "sourcePiiFields",
+            "targetPiiFields"
         ]
         data_flow_spec_schema = StructType(
             [
@@ -1530,8 +1538,8 @@ class OnboardDataflowspec:
                 StructField("appendFlows", StringType(), True),
                 StructField("appendFlowsSchemas", MapType(StringType(), StringType(), True), True),
                 StructField("clusterBy", ArrayType(StringType(), True), True),
-                StructField("source_PiiFields", MapType(StringType(), StringType(), True), True),
-                StructField("target_PiiFields", MapType(StringType(), StringType(), True), True)
+                StructField("sourcePiiFields", MapType(StringType(), StringType(), True), True),
+                StructField("targetPiiFields", MapType(StringType(), StringType(), True), True)
             ]
         )
         data = []
@@ -1555,12 +1563,19 @@ class OnboardDataflowspec:
             # Gather source_details from silver configuration if available
             if "source_details" in onboarding_row[f"silver_{env}"]:
                 source_details = onboarding_row[f"silver_{env}"]["source_details"]
-                bronze_target_details = {
+                silver_source_details = {
                     "database": source_details["catalog"] + "." + source_details["schema"],
                     "table": source_details["table"],
                 }
+            elif f"bronze_{env}" in onboarding_row and onboarding_row[f"bronze_{env}"]:
+                # Use bronze table from same row as source (combined bronze+silver flow)
+                bronze_config = onboarding_row[f"bronze_{env}"]
+                silver_source_details = {
+                    "database": bronze_config["target_details"]["catalog"] + "." + bronze_config["target_details"]["schema"],
+                    "table": bronze_config["target_details"]["table"],
+                }
             else:
-                raise Exception(f"No valid bronze source details found for silver layer in row={onboarding_row}")
+                raise Exception(f"Either silver source_details or bronze_{env} configuration required. No valid silver source details found for silver layer in row={onboarding_row}")
 
             # Extract silver target details from silver_{env} configuration
             silver_target_details = {
@@ -1642,7 +1657,7 @@ class OnboardDataflowspec:
                 silver_data_flow_spec_id,
                 silver_data_flow_spec_group,
                 "delta",
-                bronze_target_details,
+                silver_source_details,
                 silver_reader_config_options,
                 silver_target_format,
                 silver_target_details,

@@ -3,7 +3,7 @@ import logging
 import json
 from pyspark.sql import DataFrame
 from pyspark.sql.types import StructType, StructField, StringType, BooleanType
-from pyspark.sql.functions import from_json, col, current_timestamp, udf, expr, map_from_entries, variant_get, parse_json
+from pyspark.sql.functions import from_json, col, current_timestamp, udf, expr, map_from_entries, variant_get, parse_json, lit
 from src.dataflow_spec import BronzeDataflowSpec
 from src.dataflow_utils import DataflowUtils
 import pyspark.sql.types as T
@@ -192,7 +192,7 @@ class PipelineReaders:
 
         print("----------------Riyaz------------- " + str(kafka_options))
 
-        keys_to_remove = {"custom_decode_fo", "custom_decode_pmu","custom_decode_trasaction_type"}
+        keys_to_remove = {"custom_decode_fo", "custom_decode_pmu","custom_decode_trasaction_type", "custom_decode_wcr"}
         custom_removed_kafka_options = {k: v for k, v in kafka_options.items() if k not in keys_to_remove}
 
         raw_df = (
@@ -200,7 +200,6 @@ class PipelineReaders:
                 .readStream
                 .format("kafka")
                 .options(**custom_removed_kafka_options)
-                # .option("mode", "PERMISSIVE")
                 .load()
         )
 
@@ -240,6 +239,7 @@ class PipelineReaders:
             elif kafka_options["custom_decode_trasaction_type"] == "BET_FO_CANCEL":
                 print("----------------In BET_FO_CANCEL-----------------------")
                 raw_df = (raw_df
+                    .withColumn("headers", expr("transform(headers, x -> struct(x.key, decode(x.value, 'UTF-8') as value))")) 
                     .withColumn("decoded_value",expr("decode(value, 'utf-8')"))
                     .withColumn("validJson", expr("validate_json_udf(decoded_value)"))
                     .withColumn("jsonValue", from_json(col("decoded_value"),kafka_source_schema ))
@@ -301,12 +301,71 @@ class PipelineReaders:
 
                 raw_df = DataflowUtils.add_extra_record(self, raw_df, "RACE_PMU_CANCEL")
            
-            # ADD WATERMARK for PMU based on time_stamp column
-            # if 'time_stamp' in raw_df.columns:
-            #     raw_df = raw_df.withWatermark("time_stamp", "10 minutes")
-            #     print("Applied watermark on time_stamp for PMU")
-            # else:
-            #     print("Warning: time_stamp column not found for PMU raw_df - No watermark applied")
+        elif "custom_decode_wcr" in kafka_options and kafka_options["custom_decode_wcr"] == "true":
+            print("----------------in custom decode WCR-----------------------")
+            raw_df = (raw_df
+                .withColumn("headers", expr("transform(headers, x -> struct(x.key, decode(x.value, 'UTF-8') as value))"))
+                .withColumn("key", expr("decode(key, 'utf-8')"))
+                .withColumn("value", expr("decode(value, 'utf-8')"))
+                .withColumn("headers", col("headers").cast("string"))
+                .withColumn("jsonData", from_json(col("value"),kafka_source_schema ))
+                .withColumn("etl_last_update_datetime", current_timestamp())
+                .withColumn("etl_created_datetime", current_timestamp())
+                .withColumn("etl_remark", lit(None).cast('string'))
+                # .withColumn("etl_last_updated_by", lit(run_id))
+                # .withColumn("etl_created_by", lit(run_id))
+            )
+            raw_df = raw_df.selectExpr("key","value","topic","partition","offset","timestampType as timestamp_type","headers","timestamp as kfk_operation_datetime","jsonData.*","etl_last_update_datetime","etl_created_datetime","etl_remark")
+            
+            # raw_df = (
+            #             raw_df
+            #                 .withColumn("product_offer_id", expr("body.entyGrps.entys.id[0][0]").cast("string"))
+            #                 .withColumn("product_offer_status", expr("body.entyGrps.entys.status[0][0]").cast("string"))
+            #                 .withColumn("product_offer_previous_status", expr("body.entyGrps.entys.prvStatus[0][0]").cast("string"))
+            #                 .withColumn("meeting_id", expr("body.entyGrps.entys.mtgId[0][0]").cast("string"))
+            #                 .withColumn("meeting_date", expr("body.entyGrps.entys.mtgDate[0][0]").cast("string"))
+            #                 .withColumn("race_id", expr("body.entyGrps.entys.raceId[0][0]").cast("string"))
+            #                 .withColumn("race_sequence", expr("body.entyGrps.entys.raceSeq[0][0]").cast("string"))
+            #                 .withColumn("product_id", expr("body.entyGrps.entys.pdtId[0][0]").cast("string"))
+            #                 .withColumn("created_at", expr("body.entyGrps.entys.crtAt[0][0]").cast("string"))
+            #                 .withColumn("created_by", expr("body.entyGrps.entys.crtBy[0][0]").cast("string"))
+            #                 .withColumn("updated_at", expr("body.entyGrps.entys.updAt[0][0]").cast("string"))
+            #                 .withColumn("updated_by", expr("body.entyGrps.entys.updBy[0][0]").cast("string"))
+            #             )
+
+            # Using column-mapping and utilities from `/pipeline/helpers/` kfk_col_helpers module.
+            column_mapping = [
+                {"col_name":"product_offer_id","location":"body.entyGrps[].entys[].id","data_type":"string"},
+                {"col_name":"product_offer_status","location":"body.entyGrps[].entys[].status","data_type":"string"},
+                {"col_name":"product_offer_previous_status","location":"body.entyGrps[].entys[].prvStatus","data_type":"string"},
+                {"col_name":"meeting_id","location":"body.entyGrps[].entys[].mtgId","data_type":"string"},
+                {"col_name":"meeting_date","location":"body.entyGrps[].entys[].mtgDate","data_type":"date"},
+                {"col_name":"race_id","location":"body.entyGrps[].entys[].raceId","data_type":"string"},
+                {"col_name":"race_sequence","location":"body.entyGrps[].entys[].raceSeq","data_type":"int"},
+                {"col_name":"product_id","location":"body.entyGrps[].entys[].pdtId","data_type":"string"},
+                {"col_name":"created_at","location":"body.entyGrps[].entys[].crtAt","data_type":"timestamp"},
+                {"col_name":"created_by","location":"body.entyGrps[].entys[].crtBy","data_type":"string"},
+                {"col_name":"updated_at","location":"body.entyGrps[].entys[].updAt","data_type":"timestamp"},
+                {"col_name":"updated_by","location":"body.entyGrps[].entys[].updBy","data_type":"string"}
+            ]
+            raw_df = (raw_df
+                      .transform(
+                          DataflowUtils.explodeDF, 
+                          DataflowUtils.generateExplodeOrder(
+                              DataflowUtils.getNodes(
+                                  DataflowUtils.getLevels(
+                                      column_mapping
+                                      )
+                                  )
+                              )
+                          )
+                      .transform(
+                          DataflowUtils.generateCols, 
+                          DataflowUtils.getTargetCols(
+                              column_mapping
+                              )
+                          )
+            )
 
         if self.writer_config_options["includeIngestionTimeAsColumn"] == "true":
             raw_df = raw_df.withColumn("databricksIngestionTimestamp", current_timestamp())

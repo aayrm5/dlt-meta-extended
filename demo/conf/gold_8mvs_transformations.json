@@ -20,7 +20,7 @@
   "dlt_views": [
     {
       "reference_name": "bet_raw_data_vw",
-      "sql_condition": "select meeting_location, meeting_date, sub_segment, CHANNEL, bet_type, race_no, first_race_no, last_race_no, FO_Flag, ACCOUNT_NO, CUSTOMER_ID, ttl_cost, cancelled, CANCELLED_AMOUNT, TicketId from live.pmu_race_tnx_event_vw union all select meeting_location, meeting_date, sub_segment, CHANNEL, bet_type, race_no, first_race_no, last_race_no, FO_Flag, ACCOUNT_NO, CUSTOMER_ID, ttl_cost, cancelled, CANCELLED_AMOUNT, TicketId from live.fo_race_tnx_event_vw"
+      "sql_condition": "select meeting_location, meeting_date, sub_segment, channel, bet_type, race_no, first_race_no, last_race_no, fo_flag, account_no, customer_id, ttl_cost, cancelled, cancelled_amount, ticketid from live.pmu_race_tnx_event_vw union all select meeting_location, meeting_date, sub_segment, channel, bet_type, race_no, first_race_no, last_race_no, fo_flag, account_no, customer_id, ttl_cost, cancelled, cancelled_amount, ticketid from live.fo_race_tnx_event_vw"
     },
     {
       "reference_name": "mv_active_cust_count_by_meeting_sub_segment_vw",
