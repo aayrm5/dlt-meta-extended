@@ -1,8 +1,8 @@
 {
   "expect_or_drop": {
-    "primary_key_not_null": "product_offer_id is not null"
+    "primary_key_not_null": "variant_get(parse_json(decode(value, 'utf-8')), '$.body.entyGrps[0].entys[0].id','string') is not null"
   },
   "expect_or_quarantine": {
-    "null_check": "product_offer_id is null and product_offer_status is null and meeting_id is null and meeting_date is null and race_id is null and race_sequence is null and product_id is null and created_at is null and created_by is null"
+    "null_check": "variant_get(parse_json(decode(value, 'utf-8')), '$.body.entyGrps[0].entys[0].id','string') is null and variant_get(parse_json(decode(value, 'utf-8')), '$.body.entyGrps[0].entys[0].status','string') is null and variant_get(parse_json(decode(value, 'utf-8')), '$.body.entyGrps[0].entys[0].mtgId','string') is null and variant_get(parse_json(decode(value, 'utf-8')), '$.body.entyGrps[0].entys[0].mtgDate','string') is null and variant_get(parse_json(decode(value, 'utf-8')), '$.body.entyGrps[0].entys[0].raceId','string') is null and variant_get(parse_json(decode(value, 'utf-8')), '$.body.entyGrps[0].entys[0].raceSeq','string') is null and variant_get(parse_json(decode(value, 'utf-8')), '$.body.entyGrps[0].entys[0].pdtId','string') is null and variant_get(parse_json(decode(value, 'utf-8')), '$.body.entyGrps[0].entys[0].crtAt','string') is null and variant_get(parse_json(decode(value, 'utf-8')), '$.body.entyGrps[0].entys[0].crtBy','string') is null"
   }
 }

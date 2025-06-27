@@ -1,6 +1,6 @@
 [
   {
-    "data_flow_id": "ppl1",
+    "data_flow_id": "payout1",
     "data_flow_group": "hkjc-streaming-dashboard-usecase",
     "source_format": "kafka",
     "source_details_dev": {
@@ -36,100 +36,6 @@
         "catalog": "edap",
         "schema": "stg_wcr_ak",
         "table": "wcr_wagering_product_offer",
-        "path": "/Volumes/dlt_meta_uc/dlt_meta_bronze_schema/bronze_volume/data/bronze/wcr/"
-      },
-      "target_pii_fields": {
-      },
-      "partition_columns": [],
-      "cluster_by": [],
-      "is_partitioned_by_run_date": "false",
-      "is_streaming": "true",
-      "bronze_table_properties": {
-        "quality": "bronze",
-        "pipelines.autoOptimize.managed": "true",
-        "failOnDataLoss": "true",
-        "delta.autoOptimize.optimizeWrite": "true",
-        "delta.autoOptimize.autoCompact": "true",
-        "delta.enableChangeDataFeed": "true",
-        "delta.logRetentionDuration": "interval 30 days",
-        "delta.deletedFileRetentionDuration": "interval 7 days",
-        "delta.tuneFileSizesForRewrites": "true"
-      },
-      "bronze_writer_config_options": {
-        "mergeSchema": "true",
-        "includeIngestionTimeAsColumn": "true"
-      },
-      "bronze_data_quality_expectations_json_dev": "",
-      "bronze_database_quarantine_dev": "",
-      "bronze_quarantine_table": "",
-      "bronze_quarantine_table_properties": {
-        "delta.autoOptimize.optimizeWrite": "true",
-        "delta.logRetentionDuration": "interval 90 days"
-      }
-    },
-    "flatten_nested_data": "false",
-    "column_to_extract": "",
-    "version": "2.0",
-    "description": "Raw Kafka ingestion for WCR wagering product offer messages from edap-s-wcr-rwem-wager topic",
-    "metadata": {
-      "created_by": "data-engineering-team",
-      "created_date": "2025-01-15",
-      "last_modified": "2025-01-15",
-      "business_owner": "wagering-operations-team",
-      "data_classification": "internal",
-      "retention_policy": "7_years",
-      "compliance_requirements": [
-        "SOX",
-        "Internal_Audit"
-      ],
-      "tags": [
-        "wcr-data",
-        "wagering",
-        "product-offers",
-        "kafka-streaming",
-        "unity-catalog"
-      ]
-    }
-  },
-  {
-    "data_flow_id": "ppl2",
-    "data_flow_group": "hkjc-streaming-dashboard-usecase",
-    "source_format": "kafka",
-    "source_details_dev": {
-      "kafka.bootstrap.servers": "kafka.confluent.edap.corpdev.hkjc.com:9092",
-      "subscribe": "edap-s-wcr-rwem-wager",
-      "kafka.security.protocol": "SSL",
-      "kafka.ssl.endpoint.identification.algorithm": "",
-      "kafka.ssl.truststore.location": "/Volumes/edap/default/certificates/truststore/kafka_truststore.jks",
-      "kafka.ssl.keystore.location": "/Volumes/edap/default/certificates/keystore/kafka_keystore.jks",
-      "kafka.ssl.truststore.secrets.scope": "akv-secrets-etl",
-      "kafka.ssl.truststore.secrets.key": "capemm-truststore-pwd",
-      "kafka.ssl.keystore.secrets.scope": "akv-secrets-etl",
-      "kafka.ssl.keystore.secrets.key": "capemm-keystore-pwd",
-      "maxOffsetsPerTrigger": "10000",
-      "kafka.session.timeout.ms": "30000",
-      "kafka.request.timeout.ms": "60000",
-      "startingOffsets": "earliest",
-      "source_schema_path": "file:/Workspace/Users/damanbansal@hkjccorpdev.onmicrosoft.com/aayrm5-dlt-meta/demo/resources/ddl/fact_wagering_pmu_product_offer_stream.ddl"
-    },
-    "bronze_reader_options": {
-      "includeHeaders": "true",
-      "startingOffsets": "earliest",
-      "maxOffsetsPerTrigger": "10000",
-      "minPartitions": "3",
-      "failOnDataLoss": "true",
-      "kafka.session.timeout.ms": "30000",
-      "kafka.request.timeout.ms": "60000",
-      "kafka.fetch.min.bytes": "1024",
-      "kafka.fetch.max.wait.ms": "5000",
-      "kafka.max.partition.fetch.bytes": "1048576",
-      "custom_decode_wcr": "true"
-    },
-    "bronze_dev": {
-      "target_details": {
-        "catalog": "edap",
-        "schema": "stg_wcr_ak",
-        "table": "wcr_wagering_product_offer_parsed",
         "path": ""
       },
       "target_pii_fields": {},
