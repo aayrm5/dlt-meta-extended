@@ -661,7 +661,7 @@ class DataflowUtils:
                     
                     # Headers map field with BINARY values (key difference from bet schema)
                     create_map(
-                        lit("ActivityCode"), lit(bytearray(b"3"))  # Binary value for cancel
+                        lit("ActivityCode"), lit("3")  # Binary value for cancel
                     ).alias("headersRefined"),
                     
                     # Error handling fields
@@ -826,73 +826,8 @@ class DataflowUtils:
             return result_df
             
         except Exception as e:
-            print(f"*********************ERROR in dummy record addition for {transaction_type}: {str(e)}*****************************")
+            print(f"*********************ERROR in dummy record addition for {transaction_type}: {str(e)}*****************************ERROR")
             return streaming_df
         
 
-
-    """ Payout tables utility functions  """
-
-    # def addETLCols(df:DataFrame, run_id:str) -> DataFrame:
-    # """add those etl cols to df"""
-    #     return (df.withColumn("etl_last_update_datetime", current_timestamp())
-    #             .withColumn("etl_last_updated_by", lit(run_id))
-    #             .withColumn("etl_created_datetime", current_timestamp())
-    #             .withColumn("etl_created_by", lit(run_id))
-    #             )
-
-    def getTargetCols(column_mapping:dict) -> dict:
-        """for getting target columns after exploding the data list"""
-        n_dict = {}
-        [n_dict.update({d.get("col_name"): ('.'.join(d.get("location").split(".")[-2:]).replace("[]",''), d.get("data_type"))}) for d in column_mapping]
-        return n_dict
-
-    def getLevels(column_mapping:List[dict]) -> set:
-        """get distinct data levels from column mapping"""
-        n_set = set()
-        [n_set.add(d.get("location")[:(-1 * (len(d.get("location").split(".")[-1]) + 1))]) for d in column_mapping]
-        return n_set
-
-    def getNodes(n_set:set) -> set:
-        """get distinct nodes which need to explode from column mapping"""
-        nn_set = set()
-        for s in n_set:
-            levels = s.split("[]")[:-1]
-            # only get that need to explode 
-            if len(levels) > 0:
-                nn_set.add(levels[0])
-                for idx in range(1, len(levels)):
-                    nn_set.add(levels[idx -1] + levels[idx])
-        return nn_set
-
-    # generate explode order
-    def generateExplodeOrder(nn_set:set) -> list:
-        """get nodes explode order from nodes set"""
-        n_list = []
-        [n_list.append((len(x.split(".")), (x.split(".")[-1], '.'.join(x.split(".")[-2:])))) for x in nn_set]
-        return n_list
-
-    def explodeDF(df, n_list:list)-> DataFrame:
-        """explode df based on explode order"""
-        if not n_list:  # empty list are false
-            return df
-        #
-        nn_list = [x[0] for x in n_list]
-        min_rk = min(nn_list)
-        max_rk = max(nn_list)
-        #   
-        for y in range(min_rk, max_rk + 1):
-            for z in n_list:
-                if z[0] == y:
-                    df = df.withColumn(z[1][0], explode_outer(col(z[1][1])))
-                    
-        return df
-
-    def generateCols(df, n_dict:dict) -> DataFrame:
-        """generate target columns"""
-        if not n_dict:
-            return df
-        for (k,v) in n_dict.items():
-            df = df.withColumn(k, col(v[0]).cast(v[1]))
-        return df
 
