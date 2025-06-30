@@ -143,7 +143,7 @@ class DataflowPipeline:
 
     def table_has_expectations(self):
         """Table has expectations check."""
-        return self.dataflowSpec.dataQualityExpectations is not None
+        return hasattr(self.dataflowSpec, 'dataQualityExpectations') and self.dataflowSpec.dataQualityExpectations is not None
 
     def read(self):
         """Read DLT."""

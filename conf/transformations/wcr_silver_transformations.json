@@ -1,6 +1,6 @@
 [
   {
-    "target_table": "fact_wagering_pmu_product_offer_stream",
+    "target_table": "fact_wagering_pmu_product_offer_stream_dlt_meta",
     "select_exp": [
       "cast(from_json(decode(value, 'utf-8'), 'STRUCT<body: STRUCT<entyGrps: ARRAY<STRUCT<entys: ARRAY<STRUCT<crtAt: STRING, crtBy: STRING, id: STRING, mtgDate: STRING, mtgId: STRING, pdtId: STRING, prvStatus: STRING, raceId: STRING, raceSeq: BIGINT, status: STRING, updAt: STRING, updBy: STRING>>>>>>').body.entyGrps.entys.id[0][0] as string) as product_offer_id",
       "cast(from_json(decode(value, 'utf-8'), 'STRUCT<body: STRUCT<entyGrps: ARRAY<STRUCT<entys: ARRAY<STRUCT<crtAt: STRING, crtBy: STRING, id: STRING, mtgDate: STRING, mtgId: STRING, pdtId: STRING, prvStatus: STRING, raceId: STRING, raceSeq: BIGINT, status: STRING, updAt: STRING, updBy: STRING>>>>>>').body.entyGrps.entys.status[0][0] as string) as product_offer_status",
@@ -20,6 +20,6 @@
       "cast(NULL as string) as etl_remark"
     ],
     "target_partition_cols": "",
-    "where_clause":""
+    "where_clause":["variant_get(parse_json(decode(value, 'utf-8')), '$.body.entyGrps[0].entys[0].id','string') is not null and variant_get(parse_json(decode(value, 'utf-8')), '$.body.entyGrps[0].entys[0].status','string') is  not null and variant_get(parse_json(decode(value, 'utf-8')), '$.body.entyGrps[0].entys[0].mtgId','string') is not null and variant_get(parse_json(decode(value, 'utf-8')), '$.body.entyGrps[0].entys[0].mtgDate','string') is not null and variant_get(parse_json(decode(value, 'utf-8')), '$.body.entyGrps[0].entys[0].raceId','string') is not null and variant_get(parse_json(decode(value, 'utf-8')), '$.body.entyGrps[0].entys[0].raceSeq','string') is not null and variant_get(parse_json(decode(value, 'utf-8')), '$.body.entyGrps[0].entys[0].pdtId','string') is not null and variant_get(parse_json(decode(value, 'utf-8')), '$.body.entyGrps[0].entys[0].crtAt','string') is not null and variant_get(parse_json(decode(value, 'utf-8')), '$.body.entyGrps[0].entys[0].crtBy','string') is not null"]
   }
 ]

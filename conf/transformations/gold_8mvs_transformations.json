@@ -1,17 +1,17 @@
 [
   {
-  "target_table": "mv_active_cust_count_by_meeting_sub_segement",
+  "target_table": "mv_active_cust_count_by_meeting_sub_segement_dlt_meta",
   "sources": [
     {
       "reference_name": "fo_race_tnx_event_vw",
-      "source_table_dev": "edap.uc_csii_dna_rt_racing_dashboard_ak.race_transcation_event_fo", 
+      "source_table_dev": "edap.uc_csii_dna_rt_racing_dashboard.race_transcation_event_fo", 
       "filter_condition": "cancelled=false",
       "is_streaming": "true",
       "pii_fields": {"account_no":"string"}
     },
     {
       "reference_name": "pmu_race_tnx_event_vw",
-      "source_table_dev": "edap.uc_csii_dna_rt_racing_dashboard_ak.race_transcation_event_pmu", 
+      "source_table_dev": "edap.uc_csii_dna_rt_racing_dashboard.race_transcation_event_pmu", 
       "filter_condition": "cancelled=false",
       "is_streaming": "true",
       "pii_fields": {"account_no":"int"}
@@ -30,7 +30,7 @@
   },
 
   {
-  "target_table": "mv_active_cust_count_by_meeting_channel",
+  "target_table": "mv_active_cust_count_by_meeting_channel_dlt_meta",
   "sources": [],
   "dlt_views": [
     {
@@ -41,7 +41,7 @@
   },
 
   {
-  "target_table": "mv_active_cust_count_by_meeting_bet_type",
+  "target_table": "mv_active_cust_count_by_meeting_bet_type_dlt_meta",
   "sources": [],
   "dlt_views": [
     {
@@ -52,7 +52,7 @@
   },
 
   {
-  "target_table": "mv_active_cust_count_pmu_by_race_sub_segement",
+  "target_table": "mv_active_cust_count_pmu_by_race_sub_segement_dlt_meta",
   "sources": [],
   "dlt_views": [
     {
@@ -63,7 +63,7 @@
   },
 
   {
-  "target_table": "mv_active_cust_count_pmu_by_race_channel",
+  "target_table": "mv_active_cust_count_pmu_by_race_channel_dlt_meta",
   "sources": [],
   "dlt_views": [
     {
@@ -74,7 +74,7 @@
   },
 
   {
-  "target_table": "mv_active_cust_count_pmu_by_race_bet_type",
+  "target_table": "mv_active_cust_count_pmu_by_race_bet_type_dlt_meta",
   "sources": [],
   "dlt_views": [
     {
@@ -85,7 +85,7 @@
   },
 
   {
-  "target_table": "mv_race_meeting_total",
+  "target_table": "mv_race_meeting_total_dlt_meta",
   "sources": [],
   "dlt_views": [
     {
@@ -96,7 +96,7 @@
   },
 
   {
-  "target_table": "mv_race_data_recon",
+  "target_table": "mv_race_data_recon_dlt_meta",
   "sources": [],
   "dlt_views": [
     {
