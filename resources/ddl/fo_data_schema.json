@@ -1,4 +1,3 @@
--- DDL Schema Format
 activityCode BIGINT,
 activityId BIGINT,
 activityTime STRING,

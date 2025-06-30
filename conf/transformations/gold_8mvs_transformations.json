@@ -7,14 +7,14 @@
       "source_table_dev": "edap.uc_csii_dna_rt_racing_dashboard_ak.race_transcation_event_fo", 
       "filter_condition": "cancelled=false",
       "is_streaming": "true",
-      "pii_fields": {}
+      "pii_fields": {"account_no":"string"}
     },
     {
       "reference_name": "pmu_race_tnx_event_vw",
       "source_table_dev": "edap.uc_csii_dna_rt_racing_dashboard_ak.race_transcation_event_pmu", 
       "filter_condition": "cancelled=false",
       "is_streaming": "true",
-      "pii_fields": {}
+      "pii_fields": {"account_no":"int"}
     }
   ],
   "dlt_views": [

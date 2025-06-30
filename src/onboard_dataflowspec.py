@@ -933,46 +933,26 @@ class OnboardDataflowspec:
             "columnToExtract",
             "version",
             "description",
-            "metadata",
-            # "abTranslatorConfig",
-            # "abValidationRules", 
-            # "abMessageTypes",
+            "metadata"
         ]
         data_flow_spec_schema = StructType(
             [
                 StructField("dataFlowId", StringType(), True),
                 StructField("dataFlowGroup", StringType(), True),
                 StructField("sourceFormat", StringType(), True),
-                StructField(
-                    "sourceDetails", MapType(StringType(), StringType(), True), True
-                ),
-                StructField(
-                    "readerConfigOptions",
-                    MapType(StringType(), StringType(), True),
-                    True,
-                ),
+                StructField("sourceDetails", MapType(StringType(), StringType(), True), True),
+                StructField("readerConfigOptions",MapType(StringType(), StringType(), True),True,),
                 StructField("targetFormat", StringType(), True),
-                StructField(
-                    "targetDetails", MapType(StringType(), StringType(), True), True
-                ),
-                StructField(
-                    "tableProperties", MapType(StringType(), StringType(), True), True
-                ),
+                StructField("targetDetails", MapType(StringType(), StringType(), True), True),
+                StructField("tableProperties", MapType(StringType(), StringType(), True), True),
                 StructField("schema", StringType(), True),
                 StructField("partitionColumns", ArrayType(StringType(), True), True),
                 StructField("cdcApplyChanges", StringType(), True),
                 StructField("applyChangesFromSnapshot", StringType(), True),
                 StructField("dataQualityExpectations", StringType(), True),
                 StructField("quarantineTargetDetails",MapType(StringType(), StringType(), True),True,),
-                StructField("quarantineTableProperties",
-                    MapType(StringType(), StringType(), True),
-                    True,
-                ),
-                StructField(
-                    "writerConfigOptions",
-                    MapType(StringType(), StringType(), True),
-                    True,
-                ),
+                StructField("quarantineTableProperties",MapType(StringType(), StringType(), True),True,),
+                StructField("writerConfigOptions",MapType(StringType(), StringType(), True),True,),
                 StructField("appendFlows", StringType(), True),
                 StructField("appendFlowsSchemas", MapType(StringType(), StringType(), True), True),
                 StructField("clusterBy", ArrayType(StringType(), True), True),
@@ -992,9 +972,6 @@ class OnboardDataflowspec:
                     StructField("compliance_requirements", StringType(), True),
                     StructField("tags", StringType(), True)
                 ]), True)
-                # StructField("abTranslatorConfig", MapType(StringType(), StringType(), True), True),
-                # StructField("abValidationRules", MapType(StringType(), StringType(), True), True),
-                # StructField("abMessageTypes", ArrayType(StringType(), True), True),
             ]
         )
         data = []
@@ -1103,7 +1080,8 @@ class OnboardDataflowspec:
                 "bronze_writer_config_options" in onboarding_row[f"bronze_{env}"] and onboarding_row[f"bronze_{env}"]["bronze_writer_config_options"]
             ):
                 writer_config_options = self.__delete_none(
-                    onboarding_row[f"bronze_{env}"]["bronze_writer_config_options"].asDict())
+                    onboarding_row[f"bronze_{env}"]["bronze_writer_config_options"].asDict()
+                    )
             
             targetPiiFields = {}
             if (
@@ -1505,11 +1483,10 @@ class OnboardDataflowspec:
             "tableProperties",
             "partitionColumns",
             "cdcApplyChanges",
-            "dataQualityExpectations",
+            "writerConfigOptions",
             "appendFlows",
             "appendFlowsSchemas",
             "clusterBy",
-            "sourcePiiFields",
             "targetPiiFields"
         ]
         data_flow_spec_schema = StructType(
@@ -1534,11 +1511,14 @@ class OnboardDataflowspec:
                 ),
                 StructField("partitionColumns", ArrayType(StringType(), True), True),
                 StructField("cdcApplyChanges", StringType(), True),
-                StructField("dataQualityExpectations", StringType(), True),
+                StructField(
+                    "writerConfigOptions",
+                    MapType(StringType(), StringType(), True),
+                    True,
+                ),
                 StructField("appendFlows", StringType(), True),
                 StructField("appendFlowsSchemas", MapType(StringType(), StringType(), True), True),
                 StructField("clusterBy", ArrayType(StringType(), True), True),
-                StructField("sourcePiiFields", MapType(StringType(), StringType(), True), True),
                 StructField("targetPiiFields", MapType(StringType(), StringType(), True), True)
             ]
         )
@@ -1623,26 +1603,17 @@ class OnboardDataflowspec:
                         self.__delete_none(silver_cdc_apply_changes_row.asDict())
                     )
 
-            data_quality_expectations = None
-            if f"silver_data_quality_expectations_json_{env}" in onboarding_row[f"silver_{env}"]:
-                silver_data_quality_expectations_json = onboarding_row[f"silver_{env}"][f"silver_data_quality_expectations_json_{env}"]
-                if silver_data_quality_expectations_json:
-                    data_quality_expectations = self.__get_data_quality_expecations(
-                        silver_data_quality_expectations_json
+            writer_config_options = {}
+            if (
+                "silver_writer_config_options" in onboarding_row[f"silver_{env}"] and onboarding_row[f"silver_{env}"]["silver_writer_config_options"]
+            ):
+                writer_config_options = self.__delete_none(
+                    onboarding_row[f"silver_{env}"]["silver_writer_config_options"].asDict()
                     )
-
+            
             append_flows, append_flow_schemas = self.get_append_flows_json(
                 onboarding_row, f"silver_{env}", env
             )
-
-            source_PiiFields = {}
-            if (
-                "source_pii_fields" in onboarding_row[f"silver_{env}"]
-                and onboarding_row[f"silver_{env}"]["source_pii_fields"]
-            ):
-                source_PiiFields = self.__delete_none(
-                    onboarding_row[f"silver_{env}"]["source_pii_fields"].asDict()
-                )
             
             target_PiiFields = {}
             if (
@@ -1664,11 +1635,10 @@ class OnboardDataflowspec:
                 silver_table_properties,
                 silver_partition_columns,
                 silver_cdc_apply_changes,
-                data_quality_expectations,
+                writer_config_options,
                 append_flows,
                 append_flow_schemas,
                 silver_cluster_by,
-                source_PiiFields,
                 target_PiiFields
             )
             data.append(silver_row)
@@ -1693,18 +1663,14 @@ class OnboardDataflowspec:
             "dataFlowId",
             "dataFlowGroup",
             "isStreaming", 
-            # "sourceFormat", Not needed
-            # "sourceDetails", Not needed
-            # "readerConfigOptions", not needed
             "targetFormat",
             "targetDetails",
             "tableProperties",
-            # "sources",
-            # "dlt_views"
             "partitionColumns",
             "cdcApplyChanges",
             "dataQualityExpectations",
-            "appendFlows", #check relevance
+            "writerConfigOptions",
+            "appendFlows", 
             "appendFlowsSchemas",
             "clusterBy",
             "targetPiiFields",
@@ -1721,6 +1687,7 @@ class OnboardDataflowspec:
                 StructField("partitionColumns", ArrayType(StringType(), True), True),
                 StructField("cdcApplyChanges", StringType(), True),
                 StructField("dataQualityExpectations", StringType(), True),
+                StructField("writerConfigOptions",MapType(StringType(), StringType(), True),True,),
                 StructField("appendFlows", StringType(), True),
                 StructField("appendFlowsSchemas", MapType(StringType(), StringType(), True), True),
                 StructField("clusterBy", ArrayType(StringType(), True), True),
@@ -1806,7 +1773,14 @@ class OnboardDataflowspec:
                     data_quality_expectations = self.__get_data_quality_expecations(
                         gold_data_quality_expectations_json
                     )
-
+            writer_config_options = {}
+            if (
+                "gold_writer_config_options" in onboarding_row[f"gold_{env}"] and onboarding_row[f"gold_{env}"]["gold_writer_config_options"]
+            ):
+                writer_config_options = self.__delete_none(
+                    onboarding_row[f"gold_{env}"]["gold_writer_config_options"].asDict()
+                    )
+                
             append_flows, append_flow_schemas = self.get_append_flows_json(
                 onboarding_row, f"gold_{env}", env
             )
@@ -1830,6 +1804,7 @@ class OnboardDataflowspec:
                 gold_partition_columns,
                 gold_cdc_apply_changes,
                 data_quality_expectations,
+                writer_config_options,
                 append_flows,
                 append_flow_schemas,
                 gold_cluster_by,

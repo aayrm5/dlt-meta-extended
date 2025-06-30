@@ -378,8 +378,7 @@ class DataflowPipeline:
         where_clause = silver_dataflow_spec.whereClause
         
         # Get PII field configurations
-        source_pii_fields = getattr(silver_dataflow_spec, 'sourcePiiFields', {})
-        target_pii_fields = getattr(silver_dataflow_spec, 'targetPiiFields', {})
+        pii_fields = getattr(silver_dataflow_spec, 'targetPiiFields', {})
         
         # Read source data from bronze layer 
         raw_delta_table_stream = self.spark.readStream.table(
@@ -391,11 +390,11 @@ class DataflowPipeline:
         
         # Decrypt source PII fields from bronze layer 
         decrypted_data = raw_delta_table_stream
-        if source_pii_fields and len(source_pii_fields) > 0:
-            logger.info(f"Decrypting source PII fields from bronze: {list(source_pii_fields.keys())}")
+        if pii_fields and len(pii_fields) > 0:
+            logger.info(f"Decrypting source PII fields from bronze: {list(pii_fields.keys())}")
             decrypted_data = self.decryptDataset(
                 data=raw_delta_table_stream,
-                piiFields=source_pii_fields
+                piiFields=pii_fields
             )
             logger.info("Source PII decryption completed")
         else:
@@ -410,11 +409,11 @@ class DataflowPipeline:
         
         # Encrypt target PII fields for silver layer 
         final_data = transformed_data
-        if target_pii_fields and len(target_pii_fields) > 0:
-            logger.info(f"Applying PII encryption to silver layer fields: {list(target_pii_fields.keys())}")
+        if pii_fields and len(pii_fields) > 0:
+            logger.info(f"Applying PII encryption to silver layer fields: {list(pii_fields.keys())}")
             final_data = self.encryptDataset(
                 data=transformed_data,
-                piiFields=target_pii_fields,
+                piiFields=pii_fields,
                 df_spec=silver_dataflow_spec
             )
             logger.info("Target PII encryption completed for silver layer")
@@ -574,12 +573,12 @@ class DataflowPipeline:
                 return data
             piiFields = available_pii_fields
         
-        # Apply decryption to each PII field using centralized functions
+        # Apply decryption to each PII field using paramterized functions
         for column in piiFields:
             datatype = piiFields[column]
             if datatype is not None:
                 try:
-                    # Apply decryption using centralized function at catalog_dlt_meta.default
+                    # Apply decryption using paramterized function
                     data = data.withColumn(column, expr(f"{self.decrypt_function_name}({column})"))
                     logger.info(f"Decrypted PII field: {column}")
                     
