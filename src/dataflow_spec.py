@@ -203,8 +203,7 @@ class DataflowSpecUtils:
         # "abMessageTypes"
     ]
     
-    additional_silver_df_columns = [
-        "dataQualityExpectations", 
+    additional_silver_df_columns = [ 
         "appendFlows", 
         "appendFlowsSchemas", 
         "clusterBy"

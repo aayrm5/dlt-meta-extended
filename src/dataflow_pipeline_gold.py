@@ -63,12 +63,12 @@ class GoldDataflowPipeline:
         Raises:
             ValueError: Generic Error for the pipeline run """
         gold_dataflow_spec: GoldDataflowSpec = self.dataflowSpec
-        for dlt_view in gold_dataflow_spec.sources:
+        # Handle sources - check if it's a string that needs parsing
+        sources = gold_dataflow_spec.sources
+        if isinstance(sources, str):
+            sources = json.loads(sources)
+        for dlt_view in sources:
             print("----------------type of dlt_view--------------"+str(type(dlt_view)))
-            if "source_catalog" in dlt_view:
-                catalog=dlt_view["source_catalog"]
-            else:
-                catalog=None
             gold_util = GoldSourceProcessingUtils(self.spark,gold_dataflow_spec, dlt_view["reference_name"], dlt_view[f"source_table_{self.env}"], dlt_view["filter_condition"], dlt_view["pii_fields"], self.decryptDataset, dlt_view["is_streaming"] if "is_streaming" in dlt_view else "true")
             gold_util.register_source()
 
@@ -78,12 +78,12 @@ class GoldDataflowPipeline:
         Raises:
             ValueError: Generic Error for the pipeline run """
         gold_dataflow_spec: GoldDataflowSpec = self.dataflowSpec
-        for dlt_view in gold_dataflow_spec.sources:
+        # Handle sources - check if it's a string that needs parsing
+        sources = gold_dataflow_spec.sources
+        if isinstance(sources, str):
+            sources = json.loads(sources)
+        for dlt_view in sources:
             print("----------------type of dlt_view--------------"+str(type(dlt_view)))
-            if "source_catalog" in dlt_view:
-                catalog=dlt_view["source_catalog"]
-            else:
-                catalog=None
             gold_util = GoldSourceProcessingUtils(self.spark, gold_dataflow_spec, dlt_view["reference_name"], dlt_view[f"source_table_{self.env}"], dlt_view["filter_condition"], dlt_view["pii_fields"], self.decryptDataset, "false")
             gold_util.register_source()
 
@@ -97,8 +97,12 @@ class GoldDataflowPipeline:
         gold_dataflow_spec: GoldDataflowSpec = self.dataflowSpec
         tableName = f"{gold_dataflow_spec.targetDetails['table']}"
         viewName = "Silver_Gold_Views_Not_Defined"
+        # Handle dlt_views - check if it's a string that needs parsing
+        dlt_views = gold_dataflow_spec.dlt_views
+        if isinstance(dlt_views, str):
+            dlt_views = json.loads(dlt_views)
 
-        for index , dlt_view in enumerate(gold_dataflow_spec.dlt_views):
+        for index , dlt_view in enumerate(dlt_views):
             viewName = dlt_view["reference_name"]
             encrypt_data = "false"
             if( index == len(gold_dataflow_spec.dlt_views) -1 ) :

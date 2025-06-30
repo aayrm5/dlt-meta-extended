@@ -280,9 +280,9 @@ class PipelineReaders:
                     .withColumn("kafkaTopic", expr("topic"))
                     .filter("headersRefined.ActivityCode = '6'")
                 )
-                raw_df = raw_df.selectExpr("parse_message_udf(hex(value)) as root", "kafkaTopic", "kafkaPartition", "kafkaOffset", "KafkaTimeStamp")
-                raw_df = raw_df.selectExpr("kafkaOffset", "kafkaTopic", "kafkaPartition", "KafkaTimeStamp", "root.errors.*", "root.headerFields.*", "root.valueFields.*")
-                raw_df = raw_df.withColumn("msg_order_no", expr("filter(headers, x -> x.key = 'ActivityId')[0].value"))
+                raw_df = raw_df.selectExpr("parse_message_udf(hex(value)) as root", "kafkaTopic", "kafkaPartition", "kafkaOffset", "KafkaTimeStamp","headers")
+                raw_df = raw_df.selectExpr("kafkaOffset", "kafkaTopic", "kafkaPartition", "KafkaTimeStamp", "root.errors.*", "root.headerFields.*", "root.valueFields.*", "headers")
+                raw_df = raw_df.withColumn("msg_order_no", expr("filter(headers, x -> x.key = 'ActivityId')[0].value")).drop("headers")
                 if(bronze_dataflow_spec.flattenNestedData is not None and bronze_dataflow_spec.flattenNestedData == "true") :
                     if isinstance(bronze_dataflow_spec.columnToExtract, list):
                         column_to_extract = bronze_dataflow_spec.columnToExtract[0] if bronze_dataflow_spec.columnToExtract else ""
@@ -302,9 +302,9 @@ class PipelineReaders:
                     .withColumn("kafkaTopic", expr("topic"))
                     .filter("headersRefined.ActivityCode = '8'")
                 )
-                raw_df = raw_df.selectExpr("parse_message_cancel_udf(hex(value)) as root", "kafkaTopic", "kafkaPartition", "kafkaOffset", "KafkaTimeStamp")
-                raw_df = raw_df.selectExpr("kafkaOffset", "kafkaTopic", "kafkaPartition", "KafkaTimeStamp", "root.errors.*", "root.headerFields.*", "root.valueFields.*")
-                raw_df = raw_df.withColumn("msg_order_no", expr("filter(headers, x -> x.key = 'ActivityId')[0].value"))
+                raw_df = raw_df.selectExpr("parse_message_cancel_udf(hex(value)) as root", "kafkaTopic", "kafkaPartition", "kafkaOffset", "KafkaTimeStamp","headers")
+                raw_df = raw_df.selectExpr("kafkaOffset", "kafkaTopic", "kafkaPartition", "KafkaTimeStamp", "root.errors.*", "root.headerFields.*", "root.valueFields.*", "headers")
+                raw_df = raw_df.withColumn("msg_order_no", expr("filter(headers, x -> x.key = 'ActivityId')[0].value")).drop("headers")
                 if(bronze_dataflow_spec.flattenNestedData is not None and bronze_dataflow_spec.flattenNestedData == "true") :
                     if isinstance(bronze_dataflow_spec.columnToExtract, list):
                         column_to_extract = bronze_dataflow_spec.columnToExtract[0] if bronze_dataflow_spec.columnToExtract else ""
