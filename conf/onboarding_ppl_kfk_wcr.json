@@ -34,7 +34,7 @@
       "target_details": {
         "catalog": "edap",
         "schema": "stg_wcr",
-        "table": "wcr_wagering_product_offer_dlt_meta",
+        "table": "wcr_wagering_product_offer",
         "path": ""
       },
       "target_pii_fields": {},
@@ -58,7 +58,7 @@
       },
       "bronze_data_quality_expectations_json_dev": "file:/Workspace/Users/damanbansal@hkjccorpdev.onmicrosoft.com/aayrm5-dlt-meta/conf/dqe/hkjc-kafka-bronze/wcr_bronze_dq_expectations.json",
       "bronze_database_quarantine_dev": "edap.spd_wagering",
-      "bronze_quarantine_table": "kafka_wcr_reject_dlt_meta",
+      "bronze_quarantine_table": "kafka_wcr_reject",
       "bronze_quarantine_table_properties": {
         "quality": "bronze",
         "pipelines.autoOptimize.managed": "true",
@@ -70,7 +70,7 @@
       "target_details": {
         "catalog": "edap",
         "schema": "spd_wagering",
-        "table": "fact_wagering_pmu_product_offer_stream_dlt_meta",
+        "table": "fact_wagering_pmu_product_offer_stream",
         "path": "/Volumes/dlt_meta_uc/dlt_meta_silver_schema/silver_volume/data/silver/wcr/"
       },
       "target_pii_fields": {},

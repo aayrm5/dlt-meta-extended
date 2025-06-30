@@ -1,6 +1,6 @@
 [
   {
-    "target_table": "fact_wagering_pmu_product_offer_stream_dlt_meta",
+    "target_table": "fact_wagering_pmu_product_offer_stream",
     "select_exp": [
       "cast(from_json(decode(value, 'utf-8'), 'STRUCT<body: STRUCT<entyGrps: ARRAY<STRUCT<entys: ARRAY<STRUCT<crtAt: STRING, crtBy: STRING, id: STRING, mtgDate: STRING, mtgId: STRING, pdtId: STRING, prvStatus: STRING, raceId: STRING, raceSeq: BIGINT, status: STRING, updAt: STRING, updBy: STRING>>>>>>').body.entyGrps.entys.id[0][0] as string) as product_offer_id",
       "cast(from_json(decode(value, 'utf-8'), 'STRUCT<body: STRUCT<entyGrps: ARRAY<STRUCT<entys: ARRAY<STRUCT<crtAt: STRING, crtBy: STRING, id: STRING, mtgDate: STRING, mtgId: STRING, pdtId: STRING, prvStatus: STRING, raceId: STRING, raceSeq: BIGINT, status: STRING, updAt: STRING, updBy: STRING>>>>>>').body.entyGrps.entys.status[0][0] as string) as product_offer_status",

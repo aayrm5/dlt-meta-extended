@@ -6,7 +6,7 @@
     "target_details": {
       "catalog": "edap",
       "schema": "uc_csii_dna_rt_racing_dashboard",
-      "table": "mv_customer_segment_snapshot_dlt_meta",
+      "table": "mv_customer_segment_snapshot",
       "path": "/Volumes/dlt_meta_uc/dlt_meta_gold_schema/gold_volume/data/gold/stores/"
     },
     "target_pii_fields": {
@@ -48,7 +48,7 @@
     "target_details": {
       "catalog": "edap",
       "schema": "uc_csii_dna_rt_racing_dashboard",
-      "table": "mv_active_cust_count_by_meeting_sub_segement_dlt_meta",
+      "table": "mv_active_cust_count_by_meeting_sub_segement",
       "path": "/Volumes/dlt_meta_uc/dlt_meta_gold_schema/gold_volume/data/gold/stores/"
     },
     "target_pii_fields": {
@@ -90,7 +90,7 @@
     "target_details": {
       "catalog": "edap",
       "schema": "uc_csii_dna_rt_racing_dashboard",
-      "table": "mv_active_cust_count_by_meeting_channel_dlt_meta",
+      "table": "mv_active_cust_count_by_meeting_channel",
       "path": "/Volumes/dlt_meta_uc/dlt_meta_gold_schema/gold_volume/data/gold/stores/"
     },
     "target_pii_fields": {
@@ -132,7 +132,7 @@
     "target_details": {
       "catalog": "edap",
       "schema": "uc_csii_dna_rt_racing_dashboard",
-      "table": "mv_active_cust_count_by_meeting_bet_type_dlt_meta",
+      "table": "mv_active_cust_count_by_meeting_bet_type",
       "path": "/Volumes/dlt_meta_uc/dlt_meta_gold_schema/gold_volume/data/gold/stores/"
     },
     "target_pii_fields": {
@@ -174,7 +174,7 @@
     "target_details": {
       "catalog": "edap",
       "schema": "uc_csii_dna_rt_racing_dashboard",
-      "table": "mv_active_cust_count_pmu_by_race_sub_segement_dlt_meta",
+      "table": "mv_active_cust_count_pmu_by_race_sub_segement",
       "path": "/Volumes/dlt_meta_uc/dlt_meta_gold_schema/gold_volume/data/gold/stores/"
     },
     "target_pii_fields": {
@@ -216,7 +216,7 @@
     "target_details": {
       "catalog": "edap",
       "schema": "uc_csii_dna_rt_racing_dashboard",
-      "table": "mv_active_cust_count_pmu_by_race_channel_dlt_meta",
+      "table": "mv_active_cust_count_pmu_by_race_channel",
       "path": "/Volumes/dlt_meta_uc/dlt_meta_gold_schema/gold_volume/data/gold/stores/"
     },
     "target_pii_fields": {
@@ -258,7 +258,7 @@
     "target_details": {
       "catalog": "edap",
       "schema": "uc_csii_dna_rt_racing_dashboard",
-      "table": "mv_active_cust_count_pmu_by_race_bet_type_dlt_meta",
+      "table": "mv_active_cust_count_pmu_by_race_bet_type",
       "path": "/Volumes/dlt_meta_uc/dlt_meta_gold_schema/gold_volume/data/gold/stores/"
     },
     "target_pii_fields": {
@@ -300,7 +300,7 @@
     "target_details": {
       "catalog": "edap",
       "schema": "uc_csii_dna_rt_racing_dashboard",
-      "table": "mv_race_meeting_total_dlt_meta",
+      "table": "mv_race_meeting_total",
       "path": "/Volumes/dlt_meta_uc/dlt_meta_gold_schema/gold_volume/data/gold/stores/"
     },
     "target_pii_fields": {
@@ -342,7 +342,7 @@
     "target_details": {
       "catalog": "edap",
       "schema": "uc_csii_dna_rt_racing_dashboard",
-      "table": "mv_race_data_recon_dlt_meta",
+      "table": "mv_race_data_recon",
       "path": "/Volumes/dlt_meta_uc/dlt_meta_gold_schema/gold_volume/data/gold/stores/"
     },
     "target_pii_fields": {

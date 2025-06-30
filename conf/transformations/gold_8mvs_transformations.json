@@ -1,6 +1,6 @@
 [
   {
-  "target_table": "mv_active_cust_count_by_meeting_sub_segement_dlt_meta",
+  "target_table": "mv_active_cust_count_by_meeting_sub_segement",
   "sources": [
     {
       "reference_name": "fo_race_tnx_event_vw",
@@ -30,7 +30,7 @@
   },
 
   {
-  "target_table": "mv_active_cust_count_by_meeting_channel_dlt_meta",
+  "target_table": "mv_active_cust_count_by_meeting_channel",
   "sources": [],
   "dlt_views": [
     {
@@ -41,7 +41,7 @@
   },
 
   {
-  "target_table": "mv_active_cust_count_by_meeting_bet_type_dlt_meta",
+  "target_table": "mv_active_cust_count_by_meeting_bet_type",
   "sources": [],
   "dlt_views": [
     {
@@ -52,7 +52,7 @@
   },
 
   {
-  "target_table": "mv_active_cust_count_pmu_by_race_sub_segement_dlt_meta",
+  "target_table": "mv_active_cust_count_pmu_by_race_sub_segement",
   "sources": [],
   "dlt_views": [
     {
@@ -63,7 +63,7 @@
   },
 
   {
-  "target_table": "mv_active_cust_count_pmu_by_race_channel_dlt_meta",
+  "target_table": "mv_active_cust_count_pmu_by_race_channel",
   "sources": [],
   "dlt_views": [
     {
@@ -74,7 +74,7 @@
   },
 
   {
-  "target_table": "mv_active_cust_count_pmu_by_race_bet_type_dlt_meta",
+  "target_table": "mv_active_cust_count_pmu_by_race_bet_type",
   "sources": [],
   "dlt_views": [
     {
@@ -85,7 +85,7 @@
   },
 
   {
-  "target_table": "mv_race_meeting_total_dlt_meta",
+  "target_table": "mv_race_meeting_total",
   "sources": [],
   "dlt_views": [
     {
@@ -96,7 +96,7 @@
   },
 
   {
-  "target_table": "mv_race_data_recon_dlt_meta",
+  "target_table": "mv_race_data_recon",
   "sources": [],
   "dlt_views": [
     {
