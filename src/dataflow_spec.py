@@ -49,9 +49,6 @@ class BronzeDataflowSpec:
     version: str
     description: str
     metadata: map
-    # abTranslatorConfig: map = None
-    # abValidataionRules: map = None
-    # abMessageTypes: List = None
 
 @dataclass
 class SilverDataflowSpec:
@@ -69,7 +66,7 @@ class SilverDataflowSpec:
     whereClause: list
     partitionColumns: list
     cdcApplyChanges: str
-    dataQualityExpectations: str
+    writerConfigOptions: map
     appendFlows: str
     appendFlowsSchemas: map
     version: str
@@ -78,7 +75,6 @@ class SilverDataflowSpec:
     updateDate: datetime
     updatedBy: str
     clusterBy: list
-    sourcePiiFields: map
     targetPiiFields: map
 
 
@@ -89,18 +85,14 @@ class GoldDataflowSpec:
     dataFlowId: str
     dataFlowGroup: str
     isStreaming: str
-    # sourceFormat: str
-    # sourceDetails: map
-    # readerConfigOptions: map
     targetFormat: str
     targetDetails: map
     tableProperties: map
-    # writerConfigOptions: map
     sources: list
     dlt_views: list
     partitionColumns: list
     cdcApplyChanges: str
-    dataQualityExpectations: str
+    writerConfigOptions: map
     appendFlows: str
     appendFlowsSchemas: map
     version: str

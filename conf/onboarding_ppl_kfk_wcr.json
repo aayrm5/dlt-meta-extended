@@ -1,6 +1,6 @@
 [
   {
-    "data_flow_id": "payout1",
+    "data_flow_id": "payout_flow_id1",
     "data_flow_group": "hkjc-streaming-dashboard-usecase",
     "source_format": "kafka",
     "source_details_dev": {
@@ -16,12 +16,11 @@
       "kafka.ssl.keystore.secrets.key": "capemm-keystore-pwd",
       "maxOffsetsPerTrigger": "10000",
       "kafka.session.timeout.ms": "30000",
-      "kafka.request.timeout.ms": "60000",
-      "startingOffsets": "earliest"
+      "kafka.request.timeout.ms": "60000"
     },
     "bronze_reader_options": {
       "includeHeaders": "true",
-      "startingOffsets": "earliest",
+      "startingOffsets": "latest",
       "maxOffsetsPerTrigger": "10000",
       "minPartitions": "3",
       "failOnDataLoss": "true",
@@ -34,7 +33,7 @@
     "bronze_dev": {
       "target_details": {
         "catalog": "edap",
-        "schema": "stg_wcr_ak",
+        "schema": "stg_wcr",
         "table": "wcr_wagering_product_offer",
         "path": ""
       },
@@ -57,8 +56,8 @@
         "mergeSchema": "true",
         "includeIngestionTimeAsColumn": "true"
       },
-      "bronze_data_quality_expectations_json_dev": "file:/Workspace/Users/damanbansal@hkjccorpdev.onmicrosoft.com/aayrm5-dlt-meta/demo/conf/dqe/hkjc-kafka-bronze/wcr_bronze_dq_expectations.json",
-      "bronze_database_quarantine_dev": "edap.spd_wagering_ak",
+      "bronze_data_quality_expectations_json_dev": "file:/Workspace/Users/damanbansal@hkjccorpdev.onmicrosoft.com/aayrm5-dlt-meta/conf/dqe/hkjc-kafka-bronze/wcr_bronze_dq_expectations.json",
+      "bronze_database_quarantine_dev": "edap.spd_wagering",
       "bronze_quarantine_table": "kafka_wcr_reject",
       "bronze_quarantine_table_properties": {
         "quality": "bronze",
@@ -70,11 +69,10 @@
     "silver_dev": {
       "target_details": {
         "catalog": "edap",
-        "schema": "spd_wagering_ak",
+        "schema": "spd_wagering",
         "table": "fact_wagering_pmu_product_offer_stream",
         "path": "/Volumes/dlt_meta_uc/dlt_meta_silver_schema/silver_volume/data/silver/wcr/"
       },
-      "source_pii_fields": {},
       "target_pii_fields": {},
       "partition_columns": [],
       "cluster_by": [],
@@ -93,7 +91,7 @@
         "overwriteSchema": "false"
       },
       "silver_data_quality_expectations_json_dev": "",
-      "silver_transformation_json_dev": "file:/Workspace/Users/damanbansal@hkjccorpdev.onmicrosoft.com/aayrm5-dlt-meta/demo/conf/wcr_silver_transformations.json",
+      "silver_transformation_json_dev": "file:/Workspace/Users/damanbansal@hkjccorpdev.onmicrosoft.com/aayrm5-dlt-meta/conf/transformations/wcr_silver_transformations.json",
       "cdc_apply_changes": {
         "keys": [
           "product_offer_id"
@@ -109,25 +107,14 @@
     "version": "2.0",
     "description": "WCR wagering product offer pipeline with complex nested JSON parsing, data quality validation, and SCD Type 1 silver layer processing",
     "metadata": {
-      "created_by": "data-engineering-team",
-      "created_date": "2025-01-15",
-      "last_modified": "2025-01-15",
-      "business_owner": "wagering-operations-team",
-      "data_classification": "internal",
-      "retention_policy": "7_years",
-      "compliance_requirements": [
-        "SOX",
-        "Internal_Audit"
-      ],
-      "tags": [
-        "wcr-data",
-        "wagering",
-        "product-offers",
-        "kafka-streaming",
-        "nested-json",
-        "scd-type-1",
-        "unity-catalog"
-      ]
+      "created_by": "",
+      "created_date": "",
+      "last_modified": "",
+      "business_owner": "",
+      "data_classification": "",
+      "retention_policy": "",
+      "compliance_requirements": [],
+      "tags": []
     }
   }
 ]

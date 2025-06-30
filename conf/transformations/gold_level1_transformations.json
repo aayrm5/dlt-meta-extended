@@ -25,14 +25,14 @@
 		"source_table_dev": "edap.stg_ap_ak.ab_sb_bet_fo",
 		"filter_condition": "",
 		"is_streaming": "true",
-		"pii_fields":{}
+		"pii_fields":{"header__accountNo":"string"}
 	  },
     {
 		"reference_name": "ab_sb_cancel_fo_vw",
 		"source_table_dev": "edap.stg_ap_ak.ab_sb_cancel_fo",
 		"filter_condition": "",
 		"is_streaming": "true",
-		"pii_fields":{}
+		"pii_fields":{"header__accountNo":"string"}
 	  }
   ],
   "dlt_views": [
@@ -50,14 +50,14 @@
 		"source_table_dev": "edap.stg_ap_ak.ab_race_pmu",
 		"filter_condition": "",
 		"is_streaming": "true",
-		"pii_fields":{}
+		"pii_fields":{"acct_no":"int"}
 	  },
     {
 		"reference_name": "ab_cancel_pmu_vw",
 		"source_table_dev": "edap.stg_ap_ak.ab_cancel_pmu",
 		"filter_condition": "",
 		"is_streaming": "true",
-		"pii_fields":{}
+		"pii_fields":{"acct_no":"int"}
 	  },
 	  {
 		"reference_name": "v_wagering_dim_account_vw",

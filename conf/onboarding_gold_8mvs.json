@@ -5,7 +5,7 @@
   "gold_dev": {
     "target_details": {
       "catalog": "edap",
-      "schema": "uc_csii_dna_rt_racing_dashboard_ak",
+      "schema": "uc_csii_dna_rt_racing_dashboard",
       "table": "mv_customer_segment_snapshot",
       "path": "/Volumes/dlt_meta_uc/dlt_meta_gold_schema/gold_volume/data/gold/stores/"
     },
@@ -24,33 +24,21 @@
     "gold_writer_config_options": {
       "mergeSchema": "true"
     },
-    "gold_data_quality_expectations_json_dev": "",
-    "gold_transformation_json_dev": "file:/Workspace/Users/damanbansal@hkjccorpdev.onmicrosoft.com/aayrm5-dlt-meta/demo/conf/gold_level1_transformations.json"
+    "gold_transformation_json_dev": "file:/Workspace/Users/damanbansal@hkjccorpdev.onmicrosoft.com/aayrm5-dlt-meta/conf/transformations/gold_level1_transformations.json"
   },
   "flatten_nested_data": "false",
   "column_to_extract": "",
   "version": "2.0",
   "description": "Multi-layer data pipeline with bronze, silver, and gold processing for customer transaction data",
   "metadata": {
-    "created_by": "data-engineering-team",
-    "created_date": "2024-01-15",
-    "last_modified": "2024-01-15",
-    "business_owner": "customer-analytics-team",
-    "data_classification": "confidential",
-    "retention_policy": "7_years",
-    "compliance_requirements": [
-      "GDPR",
-      "CCPA",
-      "SOX"
-    ],
-    "tags": [
-      "customer-data",
-      "real-time",
-      "pii-encrypted",
-      "kafka-streaming",
-      "unity-catalog",
-      "multi-layer"
-    ]
+    "created_by": "",
+    "created_date": "",
+    "last_modified": "",
+    "business_owner": "",
+    "data_classification": "",
+    "retention_policy": "",
+    "compliance_requirements": [],
+    "tags": []
   }
 },
 {
@@ -59,7 +47,7 @@
   "gold_dev": {
     "target_details": {
       "catalog": "edap",
-      "schema": "uc_csii_dna_rt_racing_dashboard_ak",
+      "schema": "uc_csii_dna_rt_racing_dashboard",
       "table": "mv_active_cust_count_by_meeting_sub_segement",
       "path": "/Volumes/dlt_meta_uc/dlt_meta_gold_schema/gold_volume/data/gold/stores/"
     },
@@ -78,33 +66,21 @@
     "gold_writer_config_options": {
       "mergeSchema": "true"
     },
-    "gold_data_quality_expectations_json_dev": "",
-    "gold_transformation_json_dev": "file:/Workspace/Users/damanbansal@hkjccorpdev.onmicrosoft.com/aayrm5-dlt-meta/demo/conf/gold_8mvs_transformations.json"
+    "gold_transformation_json_dev": "file:/Workspace/Users/damanbansal@hkjccorpdev.onmicrosoft.com/aayrm5-dlt-meta/conf/transformations/gold_8mvs_transformations.json"
   },
   "flatten_nested_data": "false",
   "column_to_extract": "",
   "version": "2.0",
   "description": "Multi-layer data pipeline with bronze, silver, and gold processing for customer transaction data",
   "metadata": {
-    "created_by": "data-engineering-team",
-    "created_date": "2024-01-15",
-    "last_modified": "2024-01-15",
-    "business_owner": "customer-analytics-team",
-    "data_classification": "confidential",
-    "retention_policy": "7_years",
-    "compliance_requirements": [
-      "GDPR",
-      "CCPA",
-      "SOX"
-    ],
-    "tags": [
-      "customer-data",
-      "real-time",
-      "pii-encrypted",
-      "kafka-streaming",
-      "unity-catalog",
-      "multi-layer"
-    ]
+    "created_by": "",
+    "created_date": "",
+    "last_modified": "",
+    "business_owner": "",
+    "data_classification": "",
+    "retention_policy": "",
+    "compliance_requirements": [],
+    "tags": []
   }
 },
 {
@@ -113,7 +89,7 @@
   "gold_dev": {
     "target_details": {
       "catalog": "edap",
-      "schema": "uc_csii_dna_rt_racing_dashboard_ak",
+      "schema": "uc_csii_dna_rt_racing_dashboard",
       "table": "mv_active_cust_count_by_meeting_channel",
       "path": "/Volumes/dlt_meta_uc/dlt_meta_gold_schema/gold_volume/data/gold/stores/"
     },
@@ -132,33 +108,21 @@
     "gold_writer_config_options": {
       "mergeSchema": "true"
     },
-    "gold_data_quality_expectations_json_dev": "",
-    "gold_transformation_json_dev": "file:/Workspace/Users/damanbansal@hkjccorpdev.onmicrosoft.com/aayrm5-dlt-meta/demo/conf/gold_8mvs_transformations.json"
+    "gold_transformation_json_dev": "file:/Workspace/Users/damanbansal@hkjccorpdev.onmicrosoft.com/aayrm5-dlt-meta/conf/transformations/gold_8mvs_transformations.json"
   },
   "flatten_nested_data": "false",
   "column_to_extract": "",
   "version": "2.0",
   "description": "Multi-layer data pipeline with bronze, silver, and gold processing for customer transaction data",
   "metadata": {
-    "created_by": "data-engineering-team",
-    "created_date": "2024-01-15",
-    "last_modified": "2024-01-15",
-    "business_owner": "customer-analytics-team",
-    "data_classification": "confidential",
-    "retention_policy": "7_years",
-    "compliance_requirements": [
-      "GDPR",
-      "CCPA",
-      "SOX"
-    ],
-    "tags": [
-      "customer-data",
-      "real-time",
-      "pii-encrypted",
-      "kafka-streaming",
-      "unity-catalog",
-      "multi-layer"
-    ]
+    "created_by": "",
+    "created_date": "",
+    "last_modified": "",
+    "business_owner": "",
+    "data_classification": "",
+    "retention_policy": "",
+    "compliance_requirements": [],
+    "tags": []
   }
 },
 {
@@ -167,7 +131,7 @@
   "gold_dev": {
     "target_details": {
       "catalog": "edap",
-      "schema": "uc_csii_dna_rt_racing_dashboard_ak",
+      "schema": "uc_csii_dna_rt_racing_dashboard",
       "table": "mv_active_cust_count_by_meeting_bet_type",
       "path": "/Volumes/dlt_meta_uc/dlt_meta_gold_schema/gold_volume/data/gold/stores/"
     },
@@ -186,33 +150,21 @@
     "gold_writer_config_options": {
       "mergeSchema": "true"
     },
-    "gold_data_quality_expectations_json_dev": "",
-    "gold_transformation_json_dev": "file:/Workspace/Users/damanbansal@hkjccorpdev.onmicrosoft.com/aayrm5-dlt-meta/demo/conf/gold_8mvs_transformations.json"
+    "gold_transformation_json_dev": "file:/Workspace/Users/damanbansal@hkjccorpdev.onmicrosoft.com/aayrm5-dlt-meta/conf/transformations/gold_8mvs_transformations.json"
   },
   "flatten_nested_data": "false",
   "column_to_extract": "",
   "version": "2.0",
   "description": "Multi-layer data pipeline with bronze, silver, and gold processing for customer transaction data",
   "metadata": {
-    "created_by": "data-engineering-team",
-    "created_date": "2024-01-15",
-    "last_modified": "2024-01-15",
-    "business_owner": "customer-analytics-team",
-    "data_classification": "confidential",
-    "retention_policy": "7_years",
-    "compliance_requirements": [
-      "GDPR",
-      "CCPA",
-      "SOX"
-    ],
-    "tags": [
-      "customer-data",
-      "real-time",
-      "pii-encrypted",
-      "kafka-streaming",
-      "unity-catalog",
-      "multi-layer"
-    ]
+    "created_by": "",
+    "created_date": "",
+    "last_modified": "",
+    "business_owner": "",
+    "data_classification": "",
+    "retention_policy": "",
+    "compliance_requirements": [],
+    "tags": []
   }
 },
 {
@@ -221,7 +173,7 @@
   "gold_dev": {
     "target_details": {
       "catalog": "edap",
-      "schema": "uc_csii_dna_rt_racing_dashboard_ak",
+      "schema": "uc_csii_dna_rt_racing_dashboard",
       "table": "mv_active_cust_count_pmu_by_race_sub_segement",
       "path": "/Volumes/dlt_meta_uc/dlt_meta_gold_schema/gold_volume/data/gold/stores/"
     },
@@ -240,33 +192,21 @@
     "gold_writer_config_options": {
       "mergeSchema": "true"
     },
-    "gold_data_quality_expectations_json_dev": "",
-    "gold_transformation_json_dev": "file:/Workspace/Users/damanbansal@hkjccorpdev.onmicrosoft.com/aayrm5-dlt-meta/demo/conf/gold_8mvs_transformations.json"
+    "gold_transformation_json_dev": "file:/Workspace/Users/damanbansal@hkjccorpdev.onmicrosoft.com/aayrm5-dlt-meta/conf/transformations/gold_8mvs_transformations.json"
   },
   "flatten_nested_data": "false",
   "column_to_extract": "",
   "version": "2.0",
   "description": "Multi-layer data pipeline with bronze, silver, and gold processing for customer transaction data",
   "metadata": {
-    "created_by": "data-engineering-team",
-    "created_date": "2024-01-15",
-    "last_modified": "2024-01-15",
-    "business_owner": "customer-analytics-team",
-    "data_classification": "confidential",
-    "retention_policy": "7_years",
-    "compliance_requirements": [
-      "GDPR",
-      "CCPA",
-      "SOX"
-    ],
-    "tags": [
-      "customer-data",
-      "real-time",
-      "pii-encrypted",
-      "kafka-streaming",
-      "unity-catalog",
-      "multi-layer"
-    ]
+    "created_by": "",
+    "created_date": "",
+    "last_modified": "",
+    "business_owner": "",
+    "data_classification": "",
+    "retention_policy": "",
+    "compliance_requirements": [],
+    "tags": []
   }
 },
 {
@@ -275,7 +215,7 @@
   "gold_dev": {
     "target_details": {
       "catalog": "edap",
-      "schema": "uc_csii_dna_rt_racing_dashboard_ak",
+      "schema": "uc_csii_dna_rt_racing_dashboard",
       "table": "mv_active_cust_count_pmu_by_race_channel",
       "path": "/Volumes/dlt_meta_uc/dlt_meta_gold_schema/gold_volume/data/gold/stores/"
     },
@@ -294,33 +234,21 @@
     "gold_writer_config_options": {
       "mergeSchema": "true"
     },
-    "gold_data_quality_expectations_json_dev": "",
-    "gold_transformation_json_dev": "file:/Workspace/Users/damanbansal@hkjccorpdev.onmicrosoft.com/aayrm5-dlt-meta/demo/conf/gold_8mvs_transformations.json"
+    "gold_transformation_json_dev": "file:/Workspace/Users/damanbansal@hkjccorpdev.onmicrosoft.com/aayrm5-dlt-meta/conf/transformations/gold_8mvs_transformations.json"
   },
   "flatten_nested_data": "false",
   "column_to_extract": "",
   "version": "2.0",
   "description": "Multi-layer data pipeline with bronze, silver, and gold processing for customer transaction data",
   "metadata": {
-    "created_by": "data-engineering-team",
-    "created_date": "2024-01-15",
-    "last_modified": "2024-01-15",
-    "business_owner": "customer-analytics-team",
-    "data_classification": "confidential",
-    "retention_policy": "7_years",
-    "compliance_requirements": [
-      "GDPR",
-      "CCPA",
-      "SOX"
-    ],
-    "tags": [
-      "customer-data",
-      "real-time",
-      "pii-encrypted",
-      "kafka-streaming",
-      "unity-catalog",
-      "multi-layer"
-    ]
+    "created_by": "",
+    "created_date": "",
+    "last_modified": "",
+    "business_owner": "",
+    "data_classification": "",
+    "retention_policy": "",
+    "compliance_requirements": [],
+    "tags": []
   }
 },
 {
@@ -329,7 +257,7 @@
   "gold_dev": {
     "target_details": {
       "catalog": "edap",
-      "schema": "uc_csii_dna_rt_racing_dashboard_ak",
+      "schema": "uc_csii_dna_rt_racing_dashboard",
       "table": "mv_active_cust_count_pmu_by_race_bet_type",
       "path": "/Volumes/dlt_meta_uc/dlt_meta_gold_schema/gold_volume/data/gold/stores/"
     },
@@ -348,33 +276,21 @@
     "gold_writer_config_options": {
       "mergeSchema": "true"
     },
-    "gold_data_quality_expectations_json_dev": "",
-    "gold_transformation_json_dev": "file:/Workspace/Users/damanbansal@hkjccorpdev.onmicrosoft.com/aayrm5-dlt-meta/demo/conf/gold_8mvs_transformations.json"
+    "gold_transformation_json_dev": "file:/Workspace/Users/damanbansal@hkjccorpdev.onmicrosoft.com/aayrm5-dlt-meta/conf/transformations/gold_8mvs_transformations.json"
   },
   "flatten_nested_data": "false",
   "column_to_extract": "",
   "version": "2.0",
   "description": "Multi-layer data pipeline with bronze, silver, and gold processing for customer transaction data",
   "metadata": {
-    "created_by": "data-engineering-team",
-    "created_date": "2024-01-15",
-    "last_modified": "2024-01-15",
-    "business_owner": "customer-analytics-team",
-    "data_classification": "confidential",
-    "retention_policy": "7_years",
-    "compliance_requirements": [
-      "GDPR",
-      "CCPA",
-      "SOX"
-    ],
-    "tags": [
-      "customer-data",
-      "real-time",
-      "pii-encrypted",
-      "kafka-streaming",
-      "unity-catalog",
-      "multi-layer"
-    ]
+    "created_by": "",
+    "created_date": "",
+    "last_modified": "",
+    "business_owner": "",
+    "data_classification": "",
+    "retention_policy": "",
+    "compliance_requirements": [],
+    "tags": []
   }
 },
 {
@@ -383,7 +299,7 @@
   "gold_dev": {
     "target_details": {
       "catalog": "edap",
-      "schema": "uc_csii_dna_rt_racing_dashboard_ak",
+      "schema": "uc_csii_dna_rt_racing_dashboard",
       "table": "mv_race_meeting_total",
       "path": "/Volumes/dlt_meta_uc/dlt_meta_gold_schema/gold_volume/data/gold/stores/"
     },
@@ -402,33 +318,21 @@
     "gold_writer_config_options": {
       "mergeSchema": "true"
     },
-    "gold_data_quality_expectations_json_dev": "",
-    "gold_transformation_json_dev": "file:/Workspace/Users/damanbansal@hkjccorpdev.onmicrosoft.com/aayrm5-dlt-meta/demo/conf/gold_8mvs_transformations.json"
+    "gold_transformation_json_dev": "file:/Workspace/Users/damanbansal@hkjccorpdev.onmicrosoft.com/aayrm5-dlt-meta/conf/transformations/gold_8mvs_transformations.json"
   },
   "flatten_nested_data": "false",
   "column_to_extract": "",
   "version": "2.0",
   "description": "Multi-layer data pipeline with bronze, silver, and gold processing for customer transaction data",
   "metadata": {
-    "created_by": "data-engineering-team",
-    "created_date": "2024-01-15",
-    "last_modified": "2024-01-15",
-    "business_owner": "customer-analytics-team",
-    "data_classification": "confidential",
-    "retention_policy": "7_years",
-    "compliance_requirements": [
-      "GDPR",
-      "CCPA",
-      "SOX"
-    ],
-    "tags": [
-      "customer-data",
-      "real-time",
-      "pii-encrypted",
-      "kafka-streaming",
-      "unity-catalog",
-      "multi-layer"
-    ]
+    "created_by": "",
+    "created_date": "",
+    "last_modified": "",
+    "business_owner": "",
+    "data_classification": "",
+    "retention_policy": "",
+    "compliance_requirements": [],
+    "tags": []
   }
 },
 {
@@ -437,7 +341,7 @@
   "gold_dev": {
     "target_details": {
       "catalog": "edap",
-      "schema": "uc_csii_dna_rt_racing_dashboard_ak",
+      "schema": "uc_csii_dna_rt_racing_dashboard",
       "table": "mv_race_data_recon",
       "path": "/Volumes/dlt_meta_uc/dlt_meta_gold_schema/gold_volume/data/gold/stores/"
     },
@@ -456,33 +360,21 @@
     "gold_writer_config_options": {
       "mergeSchema": "true"
     },
-    "gold_data_quality_expectations_json_dev": "",
-    "gold_transformation_json_dev": "file:/Workspace/Users/damanbansal@hkjccorpdev.onmicrosoft.com/aayrm5-dlt-meta/demo/conf/gold_8mvs_transformations.json"
+    "gold_transformation_json_dev": "file:/Workspace/Users/damanbansal@hkjccorpdev.onmicrosoft.com/aayrm5-dlt-meta/conf/transformations/gold_8mvs_transformations.json"
   },
   "flatten_nested_data": "false",
   "column_to_extract": "",
   "version": "2.0",
   "description": "Multi-layer data pipeline with bronze, silver, and gold processing for customer transaction data",
   "metadata": {
-    "created_by": "data-engineering-team",
-    "created_date": "2024-01-15",
-    "last_modified": "2024-01-15",
-    "business_owner": "customer-analytics-team",
-    "data_classification": "confidential",
-    "retention_policy": "7_years",
-    "compliance_requirements": [
-      "GDPR",
-      "CCPA",
-      "SOX"
-    ],
-    "tags": [
-      "customer-data",
-      "real-time",
-      "pii-encrypted",
-      "kafka-streaming",
-      "unity-catalog",
-      "multi-layer"
-    ]
+    "created_by": "",
+    "created_date": "",
+    "last_modified": "",
+    "business_owner": "",
+    "data_classification": "",
+    "retention_policy": "",
+    "compliance_requirements": [],
+    "tags": []
   }
 }
 ]
