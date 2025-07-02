@@ -95,7 +95,7 @@
     "maxOffsetsPerTrigger": "10000",
     "kafka.session.timeout.ms": "30000",
     "kafka.request.timeout.ms": "60000",
-    "source_schema_path": "file:/Workspace/Users/damanbansal@hkjccorpdev.onmicrosoft.com/aayrm5-dlt-meta/resources/ddl/fo_data_schema.json"
+    "source_schema_path": "/Volumes/edap/dlt_meta_spec_schema/dlt-meta/schema-ddl/fo_data_schema.json"
   },
   "bronze_reader_options": {
     "includeHeaders": "true",
@@ -215,7 +215,7 @@
     "maxOffsetsPerTrigger": "10000",
     "kafka.session.timeout.ms": "30000",
     "kafka.request.timeout.ms": "60000",
-    "source_schema_path": "file:/Workspace/Users/damanbansal@hkjccorpdev.onmicrosoft.com/aayrm5-dlt-meta/resources/ddl/fo_data_schema.json"
+    "source_schema_path": "/Volumes/edap/dlt_meta_spec_schema/dlt-meta/schema-ddl/fo_data_schema.json"
   },
   "bronze_reader_options": {
     "includeHeaders": "true",
