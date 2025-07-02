@@ -1,6 +1,6 @@
 [
   {
-  "target_table": "mv_active_cust_count_by_meeting_sub_segement",
+  "target_table": "mv_active_cust_count_by_meeting_sub_segment",
   "sources": [
     {
       "reference_name": "fo_race_tnx_event_vw",
@@ -100,8 +100,12 @@
   "sources": [],
   "dlt_views": [
     {
+      "reference_name": "union_vw",
+      "sql_condition": "select meeting_location from edap.uc_csii_dna_rt_racing_dashboard.mv_active_cust_count_by_meeting_sub_segment union select meeting_location from edap.uc_csii_dna_rt_racing_dashboard.mv_active_cust_count_by_meeting_channel union select meeting_location from edap.uc_csii_dna_rt_racing_dashboard.mv_active_cust_count_by_meeting_bet_type union select meeting_location from edap.uc_csii_dna_rt_racing_dashboard.mv_active_cust_count_pmu_by_race_sub_segement union select meeting_location from edap.uc_csii_dna_rt_racing_dashboard.mv_active_cust_count_pmu_by_race_channel union select meeting_location from edap.uc_csii_dna_rt_racing_dashboard.mv_active_cust_count_pmu_by_race_bet_type union select meeting_location from edap.uc_csii_dna_rt_racing_dashboard.mv_race_meeting_total"
+    },
+    {
       "reference_name": "mv_race_data_recon_vw",
-      "sql_condition": "with union_meeting_location as (select meeting_location from live.mv_active_cust_count_by_meeting_sub_segment_vw union select meeting_location from live.mv_active_cust_count_by_meeting_channel_vw union select meeting_location from live.mv_active_cust_count_by_meeting_bet_type_vw union select meeting_location from live.mv_active_cust_count_pmu_by_race_sub_segement_vw union select meeting_location from live.mv_active_cust_count_pmu_by_race_channel_vw union select meeting_location from live.mv_active_cust_count_pmu_by_race_bet_type_vw union select meeting_location from live.mv_race_meeting_total_vw) select meeting_location, meeting_date, last_race_no as race_no,  sum(ttl_cost) as total_investment, count(distinct ticketid) as total_ticket from live.bet_raw_data_vw where meeting_location in (select meeting_location from union_meeting_location) group by meeting_location, meeting_date, last_race_no"
+      "sql_condition": "select meeting_location, meeting_date, last_race_no as race_no,  sum(ttl_cost) as total_investment, count(distinct ticketid) as total_ticket from live.bet_raw_data_vw where meeting_location in (select meeting_location from live.union_vw) group by meeting_location, meeting_date, last_race_no"
     }
   ]
   }
