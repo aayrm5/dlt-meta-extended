@@ -20,7 +20,7 @@
   "dlt_views": [
     {
       "reference_name": "bet_raw_data_vw",
-      "sql_condition": "select meeting_location, meeting_date, sub_segment, channel, bet_type, race_no, first_race_no, last_race_no, fo_flag, account_no, customer_id, ttl_cost, cancelled, cancelled_amount, ticketid from live.pmu_race_tnx_event_vw union all select meeting_location, meeting_date, sub_segment, channel, bet_type, race_no, first_race_no, last_race_no, fo_flag, account_no, customer_id, ttl_cost, cancelled, cancelled_amount, ticketid from live.fo_race_tnx_event_vw"
+      "sql_condition": "select meeting_location, meeting_date, sub_segment, channel, bet_type, race_no, first_race_no, last_race_no, fo_flag, account_no, customer_id, ttl_cost, cancelled, cancelled_amount, ticketid, time_stamp as time_stamp from live.pmu_race_tnx_event_vw union all select meeting_location, meeting_date, sub_segment, channel, bet_type, race_no, first_race_no, last_race_no, fo_flag, account_no, customer_id, ttl_cost, cancelled, cancelled_amount, ticketid, sell_time as time_stamp from live.fo_race_tnx_event_vw"
     },
     {
       "reference_name": "mv_active_cust_count_by_meeting_sub_segment_vw",
@@ -105,7 +105,7 @@
     },
     {
       "reference_name": "mv_race_data_recon_vw",
-      "sql_condition": "select meeting_location, meeting_date, last_race_no as race_no,  sum(ttl_cost) as total_investment, count(distinct ticketid) as total_ticket from live.bet_raw_data_vw where meeting_location in (select meeting_location from live.union_vw) group by meeting_location, meeting_date, last_race_no"
+      "sql_condition": "select meeting_location, meeting_date, last_race_no as race_no,  sum(ttl_cost) as total_investment, count(distinct ticketid) as total_ticket, max(time_stamp) as transaction_time from live.bet_raw_data_vw where meeting_location in (select meeting_location from live.union_vw) group by meeting_location, meeting_date, last_race_no"
     }
   ]
   }
