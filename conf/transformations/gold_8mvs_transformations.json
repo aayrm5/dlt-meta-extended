@@ -20,11 +20,11 @@
   "dlt_views": [
     {
       "reference_name": "bet_raw_data_vw",
-      "sql_condition": "select meeting_location, meeting_date, seg_team_cge_transformed, channel, bet_type, race_no, first_race_no, last_race_no, fo_flag, account_no, customer_id, ttl_cost, cancelled, cancelled_amount, ticketid, time_stamp as sell_time from live.pmu_race_tnx_event_vw union all select meeting_location, meeting_date, seg_team_cge_transformed, channel, bet_type, race_no, first_race_no, last_race_no, fo_flag, account_no, customer_id, ttl_cost, cancelled, cancelled_amount, ticketid, sell_time as sell_time from live.fo_race_tnx_event_vw"
+      "sql_condition": "select meeting_location, meeting_date, seg_team_cge_transformed, channel, bet_type, race_no, first_race_no, last_race_no, fo_flag, account_no, customer_id, ttl_cost, cancelled, cancelled_amount, ticketid, time_stamp as sell_time from live.pmu_race_tnx_event_vw where meeting_date is not null and meeting_location is not null and seg_team_cge_transformed is not null and fo_flag is not null and race_no is not null union all select meeting_location, meeting_date, seg_team_cge_transformed, channel, bet_type, race_no, first_race_no, last_race_no, fo_flag, account_no, customer_id, ttl_cost, cancelled, cancelled_amount, ticketid, sell_time as sell_time from live.fo_race_tnx_event_vw where meeting_date is not null and meeting_location is not null and seg_team_cge_transformed is not null and fo_flag is not null and race_no is not null"
     },
     {
       "reference_name": "mv_active_cust_count_by_meeting_segment_vw",
-      "sql_condition": "select meeting_location, meeting_date, seg_team_cge_transformed, count(distinct customer_id) as cnt_dstnct_customer_id from  live.bet_raw_data_vw group by meeting_location, meeting_date, seg_team_cge_transformed"
+      "sql_condition": "select meeting_location, cast(meeting_date as date) as meeting_date, seg_team_cge_transformed, count(distinct customer_id) as cnt_dstnct_customer_id from  live.bet_raw_data_vw group by meeting_location, meeting_date, seg_team_cge_transformed"
     }
   ]
   },
@@ -57,7 +57,7 @@
   "dlt_views": [
     {
       "reference_name": "mv_active_cust_count_pmu_by_race_segment_vw",
-      "sql_condition": "select meeting_location, meeting_date, race_no,seg_team_cge_transformed, count(distinct customer_id) as cnt_dstnct_customer_id from  live.bet_raw_data_vw group by meeting_location, meeting_date,  race_no, seg_team_cge_transformed"
+      "sql_condition": "select meeting_location, cast(meeting_date as date) as meeting_date, cast(race_no as smallint),seg_team_cge_transformed, count(distinct customer_id) as cnt_dstnct_customer_id from  live.bet_raw_data_vw group by meeting_location, meeting_date,  race_no, seg_team_cge_transformed"
     }
   ]
   },
@@ -68,7 +68,7 @@
   "dlt_views": [
     {
       "reference_name": "mv_active_cust_count_pmu_by_race_channel_vw",
-      "sql_condition": "select meeting_location, meeting_date,  race_no,channel, count(distinct customer_id) as cnt_dstnct_customer_id from  live.bet_raw_data_vw group by meeting_location, meeting_date,  race_no, channel"
+      "sql_condition": "select meeting_location, cast(meeting_date as date) as meeting_date,  cast(race_no as smallint),channel, count(distinct customer_id) as cnt_dstnct_customer_id from  live.bet_raw_data_vw group by meeting_location, meeting_date,  race_no, channel"
     }
   ]
   },
@@ -90,7 +90,7 @@
   "dlt_views": [
     {
       "reference_name": "mv_race_meeting_total_vw",
-      "sql_condition": "select meeting_location, cast(meeting_date as date) as meeting_date,  cast(race_no as smallint), seg_team_cge_transformed, channel, bet_type, fo_flag,  sum(ttl_cost) total_investment, cast(count(distinct ticketid) as int) as total_ticket from live.bet_raw_data_vw group by meeting_location, meeting_date,  race_no, seg_team_cge_transformed, channel, bet_type, fo_flag"
+      "sql_condition": "select meeting_location, cast(meeting_date as date) as meeting_date,  cast(race_no as smallint), seg_team_cge_transformed, channel, bet_type, fo_flag,  cast(sum(ttl_cost) as decimal(32,8)) as total_investment, cast(count(distinct ticketid) as int) as total_ticket from live.bet_raw_data_vw group by meeting_location, meeting_date,  race_no, seg_team_cge_transformed, channel, bet_type, fo_flag"
     }
   ]
   },
@@ -105,7 +105,7 @@
     },
     {
       "reference_name": "mv_race_data_recon_vw",
-      "sql_condition": "select meeting_location, cast(meeting_date as date) as meeting_date, cast(last_race_no as smallint) as race_no,  sum(ttl_cost) as total_investment, cast(count(distinct ticketid) as int) as total_ticket, cast(max(sell_time) as timestamp) as latest_sell_time from live.bet_raw_data_vw where meeting_location in (select meeting_location from live.union_vw) group by meeting_location, meeting_date, last_race_no"
+      "sql_condition": "select meeting_location, cast(meeting_date as date) as meeting_date, cast(last_race_no as smallint) as race_no,  cast(sum(ttl_cost) as decimal(32,8)) as total_investment, cast(count(distinct ticketid) as int) as total_ticket, cast(max(sell_time) as timestamp) as latest_sell_time from live.bet_raw_data_vw where meeting_location in (select meeting_location from live.union_vw) group by meeting_location, meeting_date, last_race_no"
     }
   ]
   }
