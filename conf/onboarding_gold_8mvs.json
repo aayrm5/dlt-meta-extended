@@ -48,7 +48,7 @@
     "target_details": {
       "catalog": "edap",
       "schema": "uc_csii_dna_rt_racing_dashboard",
-      "table": "mv_active_cust_count_by_meeting_sub_segment",
+      "table": "mv_active_cust_count_by_meeting_segment",
       "path": "/Volumes/dlt_meta_uc/dlt_meta_gold_schema/gold_volume/data/gold/stores/"
     },
     "target_pii_fields": {
@@ -174,7 +174,7 @@
     "target_details": {
       "catalog": "edap",
       "schema": "uc_csii_dna_rt_racing_dashboard",
-      "table": "mv_active_cust_count_pmu_by_race_sub_segement",
+      "table": "mv_active_cust_count_pmu_by_race_segment",
       "path": "/Volumes/dlt_meta_uc/dlt_meta_gold_schema/gold_volume/data/gold/stores/"
     },
     "target_pii_fields": {

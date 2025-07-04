@@ -192,16 +192,26 @@ class PipelineReaders:
 
         print("----------------Riyaz------------- " + str(kafka_options))
 
-        keys_to_remove = {"custom_decode_fo", "custom_decode_pmu","custom_decode_trasaction_type"}
+        keys_to_remove = {"custom_decode_fo", "custom_decode_pmu","custom_decode_trasaction_type","decode_headers"}
         custom_removed_kafka_options = {k: v for k, v in kafka_options.items() if k not in keys_to_remove}
 
-        raw_df = (
+        if "decode_headers" in kafka_options and kafka_options["decode_headers"] == "true":
+            raw_df = (
                 self.spark
                 .readStream
                 .format("kafka")
                 .options(**custom_removed_kafka_options)
                 .load()
-        )
+                .withColumn("headers", expr("transform(headers, x -> struct(x.key, decode(x.value, 'UTF-8') as value))"))
+            )
+        else:
+            raw_df = (
+                self.spark
+                .readStream
+                .format("kafka")
+                .options(**custom_removed_kafka_options)
+                .load()
+            )
 
         if "custom_decode_fo" in kafka_options and kafka_options["custom_decode_fo"] == "true":
             print("----------------in custom decode FO-----------------------")
