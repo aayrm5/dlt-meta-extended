@@ -1,6 +1,6 @@
 [
   {
-  "target_table": "mv_active_cust_count_by_meeting_sub_segment",
+  "target_table": "mv_active_cust_count_by_meeting_segment",
   "sources": [
     {
       "reference_name": "fo_race_tnx_event_vw",
@@ -20,11 +20,11 @@
   "dlt_views": [
     {
       "reference_name": "bet_raw_data_vw",
-      "sql_condition": "select meeting_location, meeting_date, sub_segment, channel, bet_type, race_no, first_race_no, last_race_no, fo_flag, account_no, customer_id, ttl_cost, cancelled, cancelled_amount, ticketid, time_stamp as time_stamp from live.pmu_race_tnx_event_vw union all select meeting_location, meeting_date, sub_segment, channel, bet_type, race_no, first_race_no, last_race_no, fo_flag, account_no, customer_id, ttl_cost, cancelled, cancelled_amount, ticketid, sell_time as time_stamp from live.fo_race_tnx_event_vw"
+      "sql_condition": "select meeting_location, meeting_date, seg_team_cge_transformed, channel, bet_type, race_no, first_race_no, last_race_no, fo_flag, account_no, customer_id, ttl_cost, cancelled, cancelled_amount, ticketid, time_stamp as sell_time from live.pmu_race_tnx_event_vw union all select meeting_location, meeting_date, seg_team_cge_transformed, channel, bet_type, race_no, first_race_no, last_race_no, fo_flag, account_no, customer_id, ttl_cost, cancelled, cancelled_amount, ticketid, sell_time as sell_time from live.fo_race_tnx_event_vw"
     },
     {
-      "reference_name": "mv_active_cust_count_by_meeting_sub_segment_vw",
-      "sql_condition": "select meeting_location, meeting_date, sub_segment, count(distinct customer_id) as cnt_dstnct_customer_id from  live.bet_raw_data_vw group by meeting_location, meeting_date, sub_segment"
+      "reference_name": "mv_active_cust_count_by_meeting_segment_vw",
+      "sql_condition": "select meeting_location, meeting_date, seg_team_cge_transformed, count(distinct customer_id) as cnt_dstnct_customer_id from  live.bet_raw_data_vw group by meeting_location, meeting_date, seg_team_cge_transformed"
     }
   ]
   },
@@ -35,7 +35,7 @@
   "dlt_views": [
     {
       "reference_name": "mv_active_cust_count_by_meeting_channel_vw",
-      "sql_condition": "select meeting_location, meeting_date, sub_segment,channel, count(distinct customer_id) as cnt_dstnct_customer_id from  live.bet_raw_data_vw group by meeting_location, meeting_date, sub_segment, channel"
+      "sql_condition": "select meeting_location, cast(meeting_date as date) as meeting_date, seg_team_cge_transformed,channel, count(distinct customer_id) as cust_count_distinct from  live.bet_raw_data_vw group by meeting_location, meeting_date, seg_team_cge_transformed, channel"
     }
   ]
   },
@@ -46,18 +46,18 @@
   "dlt_views": [
     {
       "reference_name": "mv_active_cust_count_by_meeting_bet_type_vw",
-      "sql_condition": "select meeting_location, meeting_date, sub_segment,bet_type,fo_flag, count(distinct customer_id) as cnt_dstnct_customer_id from  live.bet_raw_data_vw group by meeting_location, meeting_date, sub_segment, bet_type, fo_flag"
+      "sql_condition": "select meeting_location, cast(meeting_date as date) as meeting_date, bet_type,fo_flag, count(distinct customer_id) as cust_count_distinct from  live.bet_raw_data_vw where (bet_type is not null or bet_type <> '') group by meeting_location, meeting_date, bet_type, fo_flag"
     }
   ]
   },
 
   {
-  "target_table": "mv_active_cust_count_pmu_by_race_sub_segement",
+  "target_table": "mv_active_cust_count_pmu_by_race_segment",
   "sources": [],
   "dlt_views": [
     {
-      "reference_name": "mv_active_cust_count_pmu_by_race_sub_segement_vw",
-      "sql_condition": "select meeting_location, meeting_date, race_no,sub_segment, count(distinct customer_id) as cnt_dstnct_customer_id from  live.bet_raw_data_vw group by meeting_location, meeting_date,  race_no, sub_segment"
+      "reference_name": "mv_active_cust_count_pmu_by_race_segment_vw",
+      "sql_condition": "select meeting_location, meeting_date, race_no,seg_team_cge_transformed, count(distinct customer_id) as cnt_dstnct_customer_id from  live.bet_raw_data_vw group by meeting_location, meeting_date,  race_no, seg_team_cge_transformed"
     }
   ]
   },
@@ -79,7 +79,7 @@
   "dlt_views": [
     {
       "reference_name": "mv_active_cust_count_pmu_by_race_bet_type_vw",
-      "sql_condition": "select meeting_location, meeting_date, race_no,bet_type,fo_flag, count(distinct customer_id) as cnt_dstnct_customer_id from  live.bet_raw_data_vw group by meeting_location, meeting_date,  race_no, bet_type,fo_flag"
+      "sql_condition": "select meeting_location, cast(meeting_date as date) as meeting_date, cast(race_no as smallint) as race_no,bet_type,fo_flag, count(distinct customer_id) as cnt_dstnct_customer_id from  live.bet_raw_data_vw group by meeting_location, meeting_date,  race_no, bet_type,fo_flag"
     }
   ]
   },
@@ -90,7 +90,7 @@
   "dlt_views": [
     {
       "reference_name": "mv_race_meeting_total_vw",
-      "sql_condition": "select meeting_location, meeting_date,  race_no, sub_segment, channel, bet_type, fo_flag,  sum(ttl_cost) total_investment, count(distinct ticketid) as total_ticket from live.bet_raw_data_vw group by meeting_location, meeting_date,  race_no,sub_segment, channel, bet_type, fo_flag"
+      "sql_condition": "select meeting_location, cast(meeting_date as date) as meeting_date,  cast(race_no as smallint), seg_team_cge_transformed, channel, bet_type, fo_flag,  sum(ttl_cost) total_investment, cast(count(distinct ticketid) as int) as total_ticket from live.bet_raw_data_vw group by meeting_location, meeting_date,  race_no, seg_team_cge_transformed, channel, bet_type, fo_flag"
     }
   ]
   },
@@ -101,11 +101,11 @@
   "dlt_views": [
     {
       "reference_name": "union_vw",
-      "sql_condition": "select meeting_location from edap.uc_csii_dna_rt_racing_dashboard.mv_active_cust_count_by_meeting_sub_segment union select meeting_location from edap.uc_csii_dna_rt_racing_dashboard.mv_active_cust_count_by_meeting_channel union select meeting_location from edap.uc_csii_dna_rt_racing_dashboard.mv_active_cust_count_by_meeting_bet_type union select meeting_location from edap.uc_csii_dna_rt_racing_dashboard.mv_active_cust_count_pmu_by_race_sub_segement union select meeting_location from edap.uc_csii_dna_rt_racing_dashboard.mv_active_cust_count_pmu_by_race_channel union select meeting_location from edap.uc_csii_dna_rt_racing_dashboard.mv_active_cust_count_pmu_by_race_bet_type union select meeting_location from edap.uc_csii_dna_rt_racing_dashboard.mv_race_meeting_total"
+      "sql_condition": "select meeting_location from edap.uc_csii_dna_rt_racing_dashboard.mv_active_cust_count_by_meeting_segment union select meeting_location from edap.uc_csii_dna_rt_racing_dashboard.mv_active_cust_count_by_meeting_channel union select meeting_location from edap.uc_csii_dna_rt_racing_dashboard.mv_active_cust_count_by_meeting_bet_type union select meeting_location from edap.uc_csii_dna_rt_racing_dashboard.mv_active_cust_count_pmu_by_race_segment union select meeting_location from edap.uc_csii_dna_rt_racing_dashboard.mv_active_cust_count_pmu_by_race_channel union select meeting_location from edap.uc_csii_dna_rt_racing_dashboard.mv_active_cust_count_pmu_by_race_bet_type union select meeting_location from edap.uc_csii_dna_rt_racing_dashboard.mv_race_meeting_total"
     },
     {
       "reference_name": "mv_race_data_recon_vw",
-      "sql_condition": "select meeting_location, meeting_date, last_race_no as race_no,  sum(ttl_cost) as total_investment, count(distinct ticketid) as total_ticket, max(time_stamp) as transaction_time from live.bet_raw_data_vw where meeting_location in (select meeting_location from live.union_vw) group by meeting_location, meeting_date, last_race_no"
+      "sql_condition": "select meeting_location, cast(meeting_date as date) as meeting_date, cast(last_race_no as smallint) as race_no,  sum(ttl_cost) as total_investment, cast(count(distinct ticketid) as int) as total_ticket, cast(max(sell_time) as timestamp) as latest_sell_time from live.bet_raw_data_vw where meeting_location in (select meeting_location from live.union_vw) group by meeting_location, meeting_date, last_race_no"
     }
   ]
   }

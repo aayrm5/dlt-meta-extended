@@ -26,7 +26,8 @@
     "kafka.request.timeout.ms": "60000",
     "kafka.fetch.min.bytes": "1024",
     "kafka.fetch.max.wait.ms": "5000",
-    "kafka.max.partition.fetch.bytes": "1048576"
+    "kafka.max.partition.fetch.bytes": "1048576",
+    "decode_headers": "true"
   },
   "bronze_dev": {
     "target_details": {
