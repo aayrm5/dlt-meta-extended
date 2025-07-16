@@ -517,14 +517,15 @@ class DataflowUtils:
                     lit(2).cast("long").alias("ticketStatusSnapshot"),
                     lit("TRACE-001").alias("traceabilityId"),
                     lit("1").alias("sport_id"),  # Racing
-                    lit("1").alias("activity_type"),
-                    lit("2").alias("ticket_status"),
+                    lit(1).cast("long").alias("headeractivityType"),
+                    lit(2).cast("long").alias("headerticketStatus"),
+                    lit(1).cast("long").alias("headerVersionNumber"),
                     
                     # Header account and transaction fields
                     lit(1).cast("long").alias("header__accountCategory"),
                     lit("1000001").alias("header__accountNo"),
                     lit(999001).cast("long").alias("header__accountTransactionNo"),
-                    lit("WIN HV HV 01/01/2025").alias("header__betline"),
+                    lit("HR TNC1 ST 26/11/2023*2[C Fownes]@3.75+1[A S Cruz]@3.25+14[K W Lui]@25 $50 $150.00").alias("header__betline"),
                     lit(False).alias("header__crossSellIndicator"),
                     lit(12345).cast("long").alias("header__customerSessionId"),
                     lit(1000).cast("long").alias("header__dailyFixedOddsInvestment"),
@@ -679,14 +680,15 @@ class DataflowUtils:
                     lit(5).cast("long").alias("ticketStatusSnapshot"),  # Cancelled status
                     lit("TRACE-002").alias("traceabilityId"),
                     lit("1").alias("sport_id"),  # Racing
-                    lit("3").alias("activity_type"),  # Cancel activity
-                    lit("5").alias("ticket_status"),  # Cancelled
+                    lit(3).cast("long").alias("headeractivityType"),
+                    lit(5).cast("long").alias("headerticketStatus"),
+                    lit(1).cast("long").alias("headerVersionNumber"),
                     
                     # Header account and transaction fields
                     lit(1).cast("long").alias("header__accountCategory"),
                     lit("1000001").alias("header__accountNo"),
                     lit(999002).cast("long").alias("header__accountTransactionNo"),
-                    lit("WIN HV HV 01/01/2025").alias("header__betline"),
+                    lit("HR TNC1 ST 26/11/2023*2[C Fownes]@3.75+1[A S Cruz]@3.25+14[K W Lui]@25 $50 $150.00").alias("header__betline"),
                     lit(False).alias("header__crossSellIndicator"),
                     lit(12345).cast("long").alias("header__customerSessionId"),
                     lit(1000).cast("long").alias("header__dailyFixedOddsInvestment"),
